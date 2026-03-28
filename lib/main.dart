@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
@@ -12,27 +14,40 @@ import 'providers/chat_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
- try {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-} catch (e) {
-  // Firebase already initialized — safe to ignore
-}
+
+  // ✅ Load .env FIRST
+  await dotenv.load(fileName: ".env");
+
+  // ✅ Firebase init
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Firebase already initialized — safe to ignore
+  }
+
+  // ✅ Hive init
   await Hive.initFlutter();
   await Hive.openBox('appforge_cache');
+
+  // ✅ Lock orientation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+
+  // ✅ Status bar style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
+
   runApp(const AppForgeApp());
 }
 
 class AppForgeApp extends StatelessWidget {
   const AppForgeApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(

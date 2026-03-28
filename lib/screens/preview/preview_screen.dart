@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/project_model.dart';
 import '../../services/firestore_service.dart';
 import '../builder/canvas_area.dart';
+import '../../widgets/floating_ai_button.dart';
 
 class PreviewScreen extends StatefulWidget {
   final String projectId;
@@ -53,6 +54,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF060F1A),
+      floatingActionButton: const FloatingAiButton(),
       appBar: AppBar(
         backgroundColor: AppTheme.darkCard,
         leading: IconButton(
@@ -108,88 +110,90 @@ class _PreviewScreenState extends State<PreviewScreen> {
         // Phone preview
         Expanded(
           child: Center(
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-
-              // Phone frame
-              Container(
-                width: 320, height: 620,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(36),
-                  border: Border.all(color: AppTheme.darkBorder, width: 8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _primaryColor.withOpacity(0.25),
-                      blurRadius: 48,
-                      offset: const Offset(0, 20),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: Column(children: [
-                    // Status bar
-                    Container(
-                      height: 36,
-                      color: _primaryColor,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            activeScreen?.name ?? _project?.name ?? '',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          const Row(children: [
-                            Icon(Icons.signal_cellular_4_bar, color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Icon(Icons.battery_full, color: Colors.white, size: 14),
-                          ]),
-                        ],
+            child: SingleChildScrollView(
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              
+                // Phone frame
+                Container(
+                  width: 320, height: 620,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(36),
+                    border: Border.all(color: AppTheme.darkBorder, width: 8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _primaryColor.withOpacity(0.25),
+                        blurRadius: 48,
+                        offset: const Offset(0, 20),
                       ),
-                    ),
-
-                    // Widget content
-                    Expanded(
-                      child: activeScreen == null || activeScreen.widgets.isEmpty
-                          ? Center(
-                              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                                Icon(Icons.phone_android, size: 48, color: Colors.grey.shade300),
-                                const SizedBox(height: 8),
-                                Text('Empty screen', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
-                              ]),
-                            )
-                          : SingleChildScrollView(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: activeScreen.widgets.map((w) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: WidgetRenderer(widgetModel: w),
-                                )).toList(),
-                              ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Column(children: [
+                      // Status bar
+                      Container(
+                        height: 36,
+                        color: _primaryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              activeScreen?.name ?? _project?.name ?? '',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                             ),
-                    ),
-                  ]),
+                            const Row(children: [
+                              Icon(Icons.signal_cellular_4_bar, color: Colors.white, size: 14),
+                              SizedBox(width: 4),
+                              Icon(Icons.battery_full, color: Colors.white, size: 14),
+                            ]),
+                          ],
+                        ),
+                      ),
+              
+                      // Widget content
+                      Expanded(
+                        child: activeScreen == null || activeScreen.widgets.isEmpty
+                            ? Center(
+                                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                  Icon(Icons.phone_android, size: 48, color: Colors.grey.shade300),
+                                  const SizedBox(height: 8),
+                                  Text('Empty screen', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                                ]),
+                              )
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.all(10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: activeScreen.widgets.map((w) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: WidgetRenderer(widgetModel: w),
+                                  )).toList(),
+                                ),
+                              ),
+                      ),
+                    ]),
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // App info pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.darkCard,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.darkBorder),
+              
+                const SizedBox(height: 20),
+              
+                // App info pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.darkCard,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.darkBorder),
+                  ),
+                  child: Text(
+                    '📱 ${_project?.name ?? ''} · ${screens.length} screen${screens.length != 1 ? 's' : ''}',
+                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                  ),
                 ),
-                child: Text(
-                  '📱 ${_project?.name ?? ''} · ${screens.length} screen${screens.length != 1 ? 's' : ''}',
-                  style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
-                ),
-              ),
-            ]),
+              ]),
+            ),
           ),
         ),
       ]),

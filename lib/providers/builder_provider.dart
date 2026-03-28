@@ -9,6 +9,8 @@ class BuilderProvider extends ChangeNotifier {
   final _fs = FirestoreService();
   final _uuid = const Uuid();
   ProjectModel? _project;
+  bool get canUndo => _history.isNotEmpty;
+
   int _activeScreen = 0;
   WidgetModel? _selectedWidget;
   bool _isLoading = false, _isSaving = false;
@@ -18,6 +20,7 @@ class BuilderProvider extends ChangeNotifier {
   int get activeScreenIndex => _activeScreen;
   AppScreen? get activeScreen => _project?.screens.isNotEmpty == true
       ? _project!.screens[_activeScreen] : null;
+  String? get currentScreenId => activeScreen?.id;
   WidgetModel? get selectedWidget => _selectedWidget;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
@@ -30,6 +33,16 @@ class BuilderProvider extends ChangeNotifier {
   }
 
   void setActiveScreen(int i) { _activeScreen = i; _selectedWidget = null; notifyListeners(); }
+
+  void setCurrentScreen(String id) {
+    if (_project == null) return;
+    final index = _project!.screens.indexWhere((s) => s.id == id);
+    if (index != -1) {
+      _activeScreen = index;
+      _selectedWidget = null;
+      notifyListeners();
+    }
+  }
 
   void addScreen(String name) {
     if (_project == null) return;
@@ -49,7 +62,7 @@ class BuilderProvider extends ChangeNotifier {
     notifyListeners(); _autosave();
   }
 
-  void addWidget(String type, {double x = 20, double y = 60}) {
+  void addWidget(String type, int i, int j, {double x = 20, double y = 60}) {
     if (_project == null || activeScreen == null) return;
     _saveHistory();
     final w = WidgetModel(

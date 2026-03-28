@@ -37,7 +37,7 @@ class FirestoreService {
   ) async {
     final projectId = _uuid.v4();
     final now = FieldValue.serverTimestamp();
-
+ 
     // Build default screens with empty widget lists
     final screens = template.defaultScreens.map((name) => {
       'id': _uuid.v4(),

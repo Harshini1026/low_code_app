@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/project_model.dart';
 import '../../services/firestore_service.dart';
+import '../../widgets/floating_ai_button.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -51,6 +52,7 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
+      floatingActionButton: const FloatingAiButton(),
       body: StreamBuilder<List<ProjectModel>>(
         stream: user != null ? FirestoreService().getUserProjects(user.uid) : const Stream.empty(),
         builder: (context, snapshot) {
@@ -155,12 +157,7 @@ class HomeScreen extends StatelessWidget {
           ]);
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/templates'),
-        backgroundColor: AppTheme.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('New App', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-      ),
+
     );
   }
 

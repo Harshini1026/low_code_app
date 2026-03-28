@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/project_model.dart';
 import '../../services/firestore_service.dart';
+import '../../widgets/floating_ai_button.dart';
 
 class PublishScreen extends StatefulWidget {
   final String projectId;
@@ -60,6 +61,7 @@ class _PublishScreenState extends State<PublishScreen> {
     }
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
+      floatingActionButton: const FloatingAiButton(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
