@@ -9,63 +9,87 @@ import '../../screens/templates/templates_screen.dart';
 import '../../screens/builder/builder_screen.dart';
 import '../../screens/preview/preview_screen.dart';
 import '../../screens/publish/publish_screen.dart';
+import '../../screens/admin/admin_dashboard.dart';
 
 class AppRouter {
   static final _key = GlobalKey<NavigatorState>();
 
   static final router = GoRouter(
-    navigatorKey: _key,
+    navigatorKey:    _key,
     initialLocation: '/splash',
     redirect: (context, state) {
-      final auth       = context.read<AuthProvider>();
-      final loggedIn   = auth.isAuthenticated; // ✅ correct getter name
-      final path       = state.fullPath ?? '';
+      final auth    = context.read<AuthProvider>();
+      final path    = state.fullPath ?? '';
 
-      // Always allow splash through
+      // Always let splash through
       if (path == '/splash') return null;
 
-      // Not logged in → send to login (except if already going there)
-      if (!loggedIn && path != '/login') return '/login';
+      // Not logged in → login
+      if (!auth.isAuthenticated && path != '/login') return '/login';
 
-      // Logged in but on login page → send to home
-      if (loggedIn && path == '/login') return '/home';
+      // Logged in but role not loaded yet → stay (splash handles wait)
+      if (auth.isAuthenticated && !auth.roleLoaded) return null;
+
+      // ✅ Role-based redirect after login
+      if (auth.isAuthenticated && path == '/login') {
+        return auth.isAdmin ? '/admin' : '/home';
+      }
+
+      // Admin trying to access user routes → redirect to admin
+      if (auth.isAdmin &&
+          (path == '/home' || path == '/templates')) {
+        return '/admin';
+      }
+
+      // Normal user trying to access admin → redirect to home
+      if (!auth.isAdmin && path.startsWith('/admin')) {
+        return '/home';
+      }
 
       return null;
     },
     routes: [
       GoRoute(
-        path: '/splash',
+        path:    '/splash',
         builder: (c, s) => const SplashScreen(),
       ),
       GoRoute(
-        path: '/login',
+        path:    '/login',
         builder: (c, s) => const LoginScreen(),
       ),
+
+      // ── User routes ──────────────────────────────────────────────────
       GoRoute(
-        path: '/home',
+        path:    '/home',
         builder: (c, s) => const HomeScreen(),
       ),
       GoRoute(
-        path: '/templates',
+        path:    '/templates',
         builder: (c, s) => const TemplatesScreen(),
       ),
       GoRoute(
-        path: '/builder/:projectId',
+        path:    '/builder/:projectId',
         builder: (c, s) => BuilderScreen(
           projectId: s.pathParameters['projectId']!,
         ),
       ),
       GoRoute(
-        path: '/preview/:projectId',
+        path:    '/preview/:projectId',
         builder: (c, s) => PreviewScreen(
           projectId: s.pathParameters['projectId']!,
         ),
       ),
       GoRoute(
-        path: '/publish/:projectId',
+        path:    '/publish/:projectId',
         builder: (c, s) => PublishScreen(
           projectId: s.pathParameters['projectId']!,
         ),
+      ),
+
+      // ── Admin routes ─────────────────────────────────────────────────
+      GoRoute(
+        path:    '/admin',
+        builder: (c, s) => const AdminDashboard(),
       ),
     ],
   );

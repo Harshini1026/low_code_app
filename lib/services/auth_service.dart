@@ -16,33 +16,47 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
 
   // ── Email / Password Sign In ──────────────────────────────────────────────
-  Future<UserCredential> signInWithEmail(String email, String password) async {
+  Future<UserCredential> signIn(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
   }
 
+  // For backwards compatibility
+  Future<UserCredential> signInWithEmail(String email, String password) async {
+    return signIn(email, password);
+  }
+
   // ── Email / Password Register ─────────────────────────────────────────────
-  Future<UserCredential> registerWithEmail(
+  Future<UserCredential> signUp(
     String email,
     String password,
-    String displayName,
+    String name,
   ) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
-    await credential.user?.updateDisplayName(displayName);
+    await credential.user?.updateDisplayName(name);
     if (credential.user != null) {
       await _createUserProfile(
         uid: credential.user!.uid,
         email: email.trim(),
-        displayName: displayName,
+        displayName: name,
         photoUrl: null,
       );
     }
     return credential;
+  }
+
+  // For backwards compatibility
+  Future<UserCredential> registerWithEmail(
+    String email,
+    String password,
+    String displayName,
+  ) async {
+    return signUp(email, password, displayName);
   }
 
   // ── Google Sign In ────────────────────────────────────────────────────────
