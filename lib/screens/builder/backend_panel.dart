@@ -13,7 +13,7 @@ class BackendPanel extends StatefulWidget {
 
 class _BackendPanelState extends State<BackendPanel> {
   bool _addingTable = false;
-  final _nameCtrl   = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _fieldsCtrl = TextEditingController();
 
   // Local copies of auth state — synced from provider on build
@@ -25,9 +25,9 @@ class _BackendPanelState extends State<BackendPanel> {
   void initState() {
     super.initState();
     final cfg = _config;
-    _emailAuth  = cfg.emailAuth;
+    _emailAuth = cfg.emailAuth;
     _googleAuth = cfg.googleAuth;
-    _phoneAuth  = cfg.phoneAuth;
+    _phoneAuth = cfg.phoneAuth;
   }
 
   @override
@@ -72,9 +72,7 @@ class _BackendPanelState extends State<BackendPanel> {
     final project = widget.provider.project;
     if (project == null) return;
 
-    final updatedTables = _config.tables
-        .where((t) => t.id != tableId)
-        .toList();
+    final updatedTables = _config.tables.where((t) => t.id != tableId).toList();
 
     // Directly mutate via Firestore service through provider's internal save
     // by rebuilding a BackendConfig and calling the notify path
@@ -93,32 +91,38 @@ class _BackendPanelState extends State<BackendPanel> {
   // ── Toggle auth — stored locally + applied via helper ────────────────────
   void _toggleEmail(bool v) {
     setState(() => _emailAuth = v);
-    _applyBackendConfig(BackendConfig(
-      tables:     _config.tables,
-      emailAuth:  v,
-      googleAuth: _googleAuth,
-      phoneAuth:  _phoneAuth,
-    ));
+    _applyBackendConfig(
+      BackendConfig(
+        tables: _config.tables,
+        emailAuth: v,
+        googleAuth: _googleAuth,
+        phoneAuth: _phoneAuth,
+      ),
+    );
   }
 
   void _toggleGoogle(bool v) {
     setState(() => _googleAuth = v);
-    _applyBackendConfig(BackendConfig(
-      tables:     _config.tables,
-      emailAuth:  _emailAuth,
-      googleAuth: v,
-      phoneAuth:  _phoneAuth,
-    ));
+    _applyBackendConfig(
+      BackendConfig(
+        tables: _config.tables,
+        emailAuth: _emailAuth,
+        googleAuth: v,
+        phoneAuth: _phoneAuth,
+      ),
+    );
   }
 
   void _togglePhone(bool v) {
     setState(() => _phoneAuth = v);
-    _applyBackendConfig(BackendConfig(
-      tables:     _config.tables,
-      emailAuth:  _emailAuth,
-      googleAuth: _googleAuth,
-      phoneAuth:  v,
-    ));
+    _applyBackendConfig(
+      BackendConfig(
+        tables: _config.tables,
+        emailAuth: _emailAuth,
+        googleAuth: _googleAuth,
+        phoneAuth: v,
+      ),
+    );
   }
 
   // ── Apply BackendConfig — ONLY uses provider.project (no missing methods) -
@@ -135,16 +139,15 @@ class _BackendPanelState extends State<BackendPanel> {
   @override
   Widget build(BuildContext context) {
     // Sync local auth booleans in case project reloads
-    _emailAuth  = _config.emailAuth;
+    _emailAuth = _config.emailAuth;
     _googleAuth = _config.googleAuth;
-    _phoneAuth  = _config.phoneAuth;
+    _phoneAuth = _config.phoneAuth;
 
     final tables = _config.tables;
 
     return ListView(
       padding: const EdgeInsets.all(10),
       children: [
-
         // ── Database ──────────────────────────────────────────────────────
         _SectionHeader(
           icon: Icons.storage_outlined,
@@ -154,16 +157,15 @@ class _BackendPanelState extends State<BackendPanel> {
         ),
         const SizedBox(height: 10),
 
-        ...tables.map((t) => _TableCard(
-          table: t,
-          onDelete: () => _deleteTable(t.id),
-        )),
+        ...tables.map(
+          (t) => _TableCard(table: t, onDelete: () => _deleteTable(t.id)),
+        ),
 
         if (_addingTable)
           _AddTableForm(
-            nameCtrl:   _nameCtrl,
+            nameCtrl: _nameCtrl,
             fieldsCtrl: _fieldsCtrl,
-            onCreate:   _createTable,
+            onCreate: _createTable,
             onCancel: () {
               _nameCtrl.clear();
               _fieldsCtrl.clear();
@@ -171,9 +173,7 @@ class _BackendPanelState extends State<BackendPanel> {
             },
           )
         else
-          _AddTableButton(
-            onTap: () => setState(() => _addingTable = true),
-          ),
+          _AddTableButton(onTap: () => setState(() => _addingTable = true)),
 
         const SizedBox(height: 16),
         const Divider(color: AppTheme.darkBorder),
@@ -247,16 +247,18 @@ class _BackendPanelState extends State<BackendPanel> {
           ),
         ),
         const SizedBox(height: 8),
-        const Row(children: [
-          Icon(Icons.check_circle, color: AppTheme.primary, size: 14),
-          SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              'Secure · No vendor lock-in · You own your data',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+        const Row(
+          children: [
+            Icon(Icons.check_circle, color: AppTheme.primary, size: 14),
+            SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                'Secure · No vendor lock-in · You own your data',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
         const SizedBox(height: 20),
       ],
     );
@@ -270,20 +272,33 @@ class _SectionHeader extends StatelessWidget {
   final String title, subtitle;
   final Color color;
   const _SectionHeader({
-    required this.icon, required this.title,
-    required this.subtitle, required this.color,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
   });
   @override
-  Widget build(BuildContext context) => Row(children: [
-    Icon(icon, color: color, size: 16),
-    const SizedBox(width: 6),
-    Text(title, style: const TextStyle(
-        color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
-    if (subtitle.isNotEmpty) ...[
-      const Spacer(),
-      Text(subtitle, style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, color: color, size: 16),
+      const SizedBox(width: 6),
+      Text(
+        title,
+        style: const TextStyle(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
+      ),
+      if (subtitle.isNotEmpty) ...[
+        const Spacer(),
+        Text(
+          subtitle,
+          style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+        ),
+      ],
     ],
-  ]);
+  );
 }
 
 class _TableCard extends StatelessWidget {
@@ -299,30 +314,70 @@ class _TableCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppTheme.darkBorder),
     ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        const Icon(Icons.table_chart_outlined, size: 14, color: AppTheme.primary),
-        const SizedBox(width: 6),
-        Expanded(child: Text(table.name, style: const TextStyle(
-            color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 13))),
-        Text('${table.fields.length} fields',
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 10)),
-        const SizedBox(width: 6),
-        GestureDetector(onTap: onDelete,
-            child: const Icon(Icons.close, size: 14, color: AppTheme.accent)),
-      ]),
-      const SizedBox(height: 8),
-      Wrap(spacing: 4, runSpacing: 4,
-        children: table.fields.take(8).map((f) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-          ),
-          child: Text(f, style: const TextStyle(color: AppTheme.primary, fontSize: 10)),
-        )).toList()),
-    ]),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.table_chart_outlined,
+              size: 14,
+              color: AppTheme.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                table.name,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            Text(
+              '${table.fields.length} fields',
+              style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: onDelete,
+              child: const Icon(Icons.close, size: 14, color: AppTheme.accent),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: table.fields
+              .take(8)
+              .map(
+                (f) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppTheme.primary.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Text(
+                    f,
+                    style: const TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    ),
   );
 }
 
@@ -330,8 +385,10 @@ class _AddTableForm extends StatelessWidget {
   final TextEditingController nameCtrl, fieldsCtrl;
   final VoidCallback onCreate, onCancel;
   const _AddTableForm({
-    required this.nameCtrl, required this.fieldsCtrl,
-    required this.onCreate, required this.onCancel,
+    required this.nameCtrl,
+    required this.fieldsCtrl,
+    required this.onCreate,
+    required this.onCancel,
   });
   @override
   Widget build(BuildContext context) => Container(
@@ -342,33 +399,70 @@ class _AddTableForm extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppTheme.primary),
     ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('New Table', style: TextStyle(
-          color: AppTheme.primary, fontWeight: FontWeight.w700, fontSize: 12)),
-      const SizedBox(height: 8),
-      TextField(controller: nameCtrl, autofocus: true,
-        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-        decoration: const InputDecoration(hintText: 'Table name (e.g. Products)',
-            isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8))),
-      const SizedBox(height: 8),
-      TextField(controller: fieldsCtrl,
-        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-        decoration: const InputDecoration(hintText: 'Fields: name, price, image',
-            isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'New Table',
+          style: TextStyle(
+            color: AppTheme.primary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+          decoration: const InputDecoration(
+            hintText: 'Table name (e.g. Products)',
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: fieldsCtrl,
+          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+          decoration: const InputDecoration(
+            hintText: 'Fields: name, price, image',
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             helperText: 'Comma separated. id & created_at auto-added.',
-            helperStyle: TextStyle(fontSize: 10, color: AppTheme.textMuted))),
-      const SizedBox(height: 10),
-      Row(children: [
-        Expanded(child: ElevatedButton(onPressed: onCreate,
-            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8)),
-            child: const Text('Create Table', style: TextStyle(fontSize: 12)))),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: onCancel,
-            style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-            child: const Text('Cancel', style: TextStyle(fontSize: 12))),
-      ]),
-    ]),
+            helperStyle: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: onCreate,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                child: const Text(
+                  'Create Table',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: onCancel,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 12,
+                ),
+              ),
+              child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+      ],
+    ),
   );
 }
 
@@ -383,14 +477,24 @@ class _AddTableButton extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.darkBorder)),
-      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.add, color: AppTheme.primary, size: 16),
-        SizedBox(width: 6),
-        Text('Create Table', style: TextStyle(
-            color: AppTheme.primary, fontWeight: FontWeight.w700, fontSize: 13)),
-      ]),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.darkBorder),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.add, color: AppTheme.primary, size: 16),
+          SizedBox(width: 6),
+          Text(
+            'Create Table',
+            style: TextStyle(
+              color: AppTheme.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -400,20 +504,28 @@ class _AuthToggleRow extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
   const _AuthToggleRow({
-    required this.label, required this.value, required this.onChanged,
+    required this.label,
+    required this.value,
+    required this.onChanged,
   });
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
-    child: Row(children: [
-      Expanded(child: Text(label,
-          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12))),
-      Switch(
-        value: value,
-        activeColor: AppTheme.primary,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        onChanged: onChanged,
-      ),
-    ]),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12),
+          ),
+        ),
+        Switch(
+          value: value,
+          activeColor: AppTheme.primary,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          onChanged: onChanged,
+        ),
+      ],
+    ),
   );
 }

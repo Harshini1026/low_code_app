@@ -20,11 +20,14 @@ class _FloatingAiButtonState extends State<FloatingAiButton>
   @override
   void initState() {
     super.initState();
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))
-      ..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.95, end: 1.08).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(
+      begin: 0.95,
+      end: 1.08,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -49,10 +52,10 @@ class _FloatingAiButtonState extends State<FloatingAiButton>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-
             // Glow ring
             Container(
-              width: 60, height: 60,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppTheme.primary.withOpacity(0.15),
@@ -61,7 +64,8 @@ class _FloatingAiButtonState extends State<FloatingAiButton>
 
             // Main button
             Container(
-              width: 54, height: 54,
+              width: 54,
+              height: 54,
               margin: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 gradient: AppTheme.primaryGradient,
@@ -82,17 +86,32 @@ class _FloatingAiButtonState extends State<FloatingAiButton>
             // Notification badge
             if (chat.hasNewSuggestion)
               Positioned(
-                top: 0, right: 0,
-                child: Container(
-                  width: 18, height: 18,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Text('!', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
-                  ),
-                ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(0.85, 0.85), end: const Offset(1.15, 1.15)),
+                top: 0,
+                right: 0,
+                child:
+                    Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.accent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scale(
+                          begin: const Offset(0.85, 0.85),
+                          end: const Offset(1.15, 1.15),
+                        ),
               ),
           ],
         ),

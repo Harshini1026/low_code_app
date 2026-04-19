@@ -11,24 +11,24 @@ enum AuthStatus { initial, authenticated, unauthenticated }
 // Everything else unchanged from original
 // ══════════════════════════════════════════════════════════════════════════════
 class AuthProvider extends ChangeNotifier {
-  final AuthService   _authService  = AuthService();
-  final AdminService  _adminService = AdminService();
+  final AuthService _authService = AuthService();
+  final AdminService _adminService = AdminService();
 
-  AuthStatus _status       = AuthStatus.initial;
-  User?      _user;
-  String?    _errorMessage;
-  String     _userRole     = 'user';   // 'user' | 'admin'
-  bool       _roleLoaded   = false;
+  AuthStatus _status = AuthStatus.initial;
+  User? _user;
+  String? _errorMessage;
+  String _userRole = 'user'; // 'user' | 'admin'
+  bool _roleLoaded = false;
 
   // ── Getters ────────────────────────────────────────────────────────────────
-  AuthStatus get status        => _status;
-  User?      get user          => _user;
-  bool       get isAuthenticated => _user != null;
-  bool       get isLoggedIn    => _user != null;       // kept for compatibility
-  String?    get errorMessage  => _errorMessage;
-  String     get userRole      => _userRole;
-  bool       get isAdmin       => _userRole == 'admin';
-  bool       get roleLoaded    => _roleLoaded;
+  AuthStatus get status => _status;
+  User? get user => _user;
+  bool get isAuthenticated => _user != null;
+  bool get isLoggedIn => _user != null; // kept for compatibility
+  String? get errorMessage => _errorMessage;
+  String get userRole => _userRole;
+  bool get isAdmin => _userRole == 'admin';
+  bool get roleLoaded => _roleLoaded;
 
   AuthProvider() {
     _authService.authStateChanges.listen(_onAuthChanged);
@@ -37,13 +37,13 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _onAuthChanged(User? user) async {
     _user = user;
     if (user != null) {
-      _status     = AuthStatus.authenticated;
+      _status = AuthStatus.authenticated;
       _roleLoaded = false;
       // Load role from Firestore after auth
       await _loadRole(user.uid);
     } else {
-      _status     = AuthStatus.unauthenticated;
-      _userRole   = 'user';
+      _status = AuthStatus.unauthenticated;
+      _userRole = 'user';
       _roleLoaded = false;
       notifyListeners();
     }
@@ -53,9 +53,9 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _loadRole(String uid) async {
     try {
       final admin = await _adminService.isAdmin(uid);
-      _userRole   = admin ? 'admin' : 'user';
+      _userRole = admin ? 'admin' : 'user';
     } catch (_) {
-      _userRole   = 'user';
+      _userRole = 'user';
     }
     _roleLoaded = true;
     notifyListeners();
@@ -102,7 +102,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-
   // ── Password reset ─────────────────────────────────────────────────────────
   Future<void> sendPasswordReset(String email) async {
     await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
@@ -111,19 +110,25 @@ class AuthProvider extends ChangeNotifier {
   // ── Sign out ───────────────────────────────────────────────────────────────
   Future<void> signOut() async {
     await _authService.signOut();
-    _userRole   = 'user';
+    _userRole = 'user';
     _roleLoaded = false;
     notifyListeners();
   }
 
   String _mapError(String code) {
     switch (code) {
-      case 'user-not-found':    return 'No account found with this email.';
-      case 'wrong-password':    return 'Incorrect password.';
-      case 'email-already-in-use': return 'Email already in use.';
-      case 'weak-password':     return 'Password is too weak.';
-      case 'invalid-email':     return 'Invalid email address.';
-      default:                  return 'Authentication failed. Please try again.';
+      case 'user-not-found':
+        return 'No account found with this email.';
+      case 'wrong-password':
+        return 'Incorrect password.';
+      case 'email-already-in-use':
+        return 'Email already in use.';
+      case 'weak-password':
+        return 'Password is too weak.';
+      case 'invalid-email':
+        return 'Invalid email address.';
+      default:
+        return 'Authentication failed. Please try again.';
     }
   }
 }

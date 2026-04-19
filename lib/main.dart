@@ -16,7 +16,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ✅ Load .env FIRST
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: "assets/.env");
+  } catch (e) {
+    // .env file not found or failed to load - continue with defaults
+    print('Warning: .env file not found, using defaults');
+  }
 
   // ✅ Firebase init
   try {

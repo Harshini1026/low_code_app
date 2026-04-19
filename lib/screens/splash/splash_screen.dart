@@ -40,31 +40,30 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
             // ── Animated logo ───────────────────────────────────────────
             Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withOpacity(0.5),
-                    blurRadius: 40,
-                    spreadRadius: 4,
-                    offset: const Offset(0, 10),
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primary.withOpacity(0.5),
+                        blurRadius: 40,
+                        spreadRadius: 4,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: const Center(
-                child: Text('⚡', style: TextStyle(fontSize: 52)),
-              ),
-            )
-            .animate()
-            .scale(duration: 700.ms, curve: Curves.elasticOut)
-            .then()
-            .shimmer(duration: 1200.ms, color: Colors.white24),
+                  child: const Center(
+                    child: Text('⚡', style: TextStyle(fontSize: 52)),
+                  ),
+                )
+                .animate()
+                .scale(duration: 700.ms, curve: Curves.elasticOut)
+                .then()
+                .shimmer(duration: 1200.ms, color: Colors.white24),
 
             const SizedBox(height: 24),
 
@@ -96,24 +95,33 @@ class _SplashScreenState extends State<SplashScreen> {
             // ── Loading dots ────────────────────────────────────────────
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) =>
-                Container(
-                  width: 8, height: 8,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.6),
-                    shape: BoxShape.circle,
-                  ),
-                )
-                .animate(onPlay: (c) => c.repeat())
-                .scaleXY(
-                  begin: 0.6, end: 1.2,
-                  duration: 600.ms,
-                  delay: Duration(milliseconds: i * 150),
-                  curve: Curves.easeInOut,
-                )
-                .then()
-                .scaleXY(begin: 1.2, end: 0.6, duration: 600.ms, curve: Curves.easeInOut),
+              children: List.generate(
+                3,
+                (i) =>
+                    Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                        .animate(onPlay: (c) => c.repeat())
+                        .scaleXY(
+                          begin: 0.6,
+                          end: 1.2,
+                          duration: 600.ms,
+                          delay: Duration(milliseconds: i * 150),
+                          curve: Curves.easeInOut,
+                        )
+                        .then()
+                        .scaleXY(
+                          begin: 1.2,
+                          end: 0.6,
+                          duration: 600.ms,
+                          curve: Curves.easeInOut,
+                        ),
               ),
             ).animate().fadeIn(delay: 700.ms),
 

@@ -15,11 +15,11 @@ class AppRouter {
   static final _key = GlobalKey<NavigatorState>();
 
   static final router = GoRouter(
-    navigatorKey:    _key,
+    navigatorKey: _key,
     initialLocation: '/splash',
     redirect: (context, state) {
-      final auth    = context.read<AuthProvider>();
-      final path    = state.fullPath ?? '';
+      final auth = context.read<AuthProvider>();
+      final path = state.fullPath ?? '';
 
       // Always let splash through
       if (path == '/splash') return null;
@@ -36,8 +36,7 @@ class AppRouter {
       }
 
       // Admin trying to access user routes → redirect to admin
-      if (auth.isAdmin &&
-          (path == '/home' || path == '/templates')) {
+      if (auth.isAdmin && (path == '/home' || path == '/templates')) {
         return '/admin';
       }
 
@@ -49,48 +48,30 @@ class AppRouter {
       return null;
     },
     routes: [
-      GoRoute(
-        path:    '/splash',
-        builder: (c, s) => const SplashScreen(),
-      ),
-      GoRoute(
-        path:    '/login',
-        builder: (c, s) => const LoginScreen(),
-      ),
+      GoRoute(path: '/splash', builder: (c, s) => const SplashScreen()),
+      GoRoute(path: '/login', builder: (c, s) => const LoginScreen()),
 
       // ── User routes ──────────────────────────────────────────────────
+      GoRoute(path: '/home', builder: (c, s) => const HomeScreen()),
+      GoRoute(path: '/templates', builder: (c, s) => const TemplatesScreen()),
       GoRoute(
-        path:    '/home',
-        builder: (c, s) => const HomeScreen(),
+        path: '/builder/:projectId',
+        builder: (c, s) =>
+            BuilderScreen(projectId: s.pathParameters['projectId']!),
       ),
       GoRoute(
-        path:    '/templates',
-        builder: (c, s) => const TemplatesScreen(),
+        path: '/preview/:projectId',
+        builder: (c, s) =>
+            PreviewScreen(projectId: s.pathParameters['projectId']!),
       ),
       GoRoute(
-        path:    '/builder/:projectId',
-        builder: (c, s) => BuilderScreen(
-          projectId: s.pathParameters['projectId']!,
-        ),
-      ),
-      GoRoute(
-        path:    '/preview/:projectId',
-        builder: (c, s) => PreviewScreen(
-          projectId: s.pathParameters['projectId']!,
-        ),
-      ),
-      GoRoute(
-        path:    '/publish/:projectId',
-        builder: (c, s) => PublishScreen(
-          projectId: s.pathParameters['projectId']!,
-        ),
+        path: '/publish/:projectId',
+        builder: (c, s) =>
+            PublishScreen(projectId: s.pathParameters['projectId']!),
       ),
 
       // ── Admin routes ─────────────────────────────────────────────────
-      GoRoute(
-        path:    '/admin',
-        builder: (c, s) => const AdminDashboard(),
-      ),
+      GoRoute(path: '/admin', builder: (c, s) => const AdminDashboard()),
     ],
   );
 }

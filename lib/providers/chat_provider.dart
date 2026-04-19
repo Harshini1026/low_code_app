@@ -5,9 +5,9 @@ enum ChatStatus { idle, thinking }
 
 // ── ChatMessage model (unchanged) ─────────────────────────────────────────────
 class ChatMessage {
-  final String   id;
-  final String   text;
-  final bool     isUser;
+  final String id;
+  final String text;
+  final bool isUser;
   final DateTime timestamp;
 
   const ChatMessage({
@@ -27,16 +27,16 @@ class ChatMessage {
 class ChatProvider extends ChangeNotifier {
   final AiChatService _service = AiChatService();
 
-  final List<ChatMessage> _messages            = [];
-  ChatStatus              _status              = ChatStatus.idle;
-  bool                    _hasNewSuggestion    = false;
+  final List<ChatMessage> _messages = [];
+  ChatStatus _status = ChatStatus.idle;
+  bool _hasNewSuggestion = false;
 
   // ── Getters (unchanged) ───────────────────────────────────────────────────
-  List<ChatMessage> get messages          => List.unmodifiable(_messages);
-  ChatStatus        get status            => _status;
-  bool              get isThinking        => _status == ChatStatus.thinking;
-  bool              get hasNewSuggestion  => _hasNewSuggestion;
-  bool              get isEmpty           => _messages.isEmpty;
+  List<ChatMessage> get messages => List.unmodifiable(_messages);
+  ChatStatus get status => _status;
+  bool get isThinking => _status == ChatStatus.thinking;
+  bool get hasNewSuggestion => _hasNewSuggestion;
+  bool get isEmpty => _messages.isEmpty;
 
   // ── Welcome message (unchanged) ───────────────────────────────────────────
   ChatProvider() {
@@ -56,13 +56,15 @@ class ChatProvider extends ChangeNotifier {
     if (text.trim().isEmpty) return;
 
     // 1. Add user bubble immediately
-    _messages.add(ChatMessage(
-      id:        DateTime.now().millisecondsSinceEpoch.toString(),
-      text:      text.trim(),
-      isUser:    true,
-      timestamp: DateTime.now(),
-    ));
-    _status = ChatStatus.thinking;   // shows typing indicator in UI
+    _messages.add(
+      ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        text: text.trim(),
+        isUser: true,
+        timestamp: DateTime.now(),
+      ),
+    );
+    _status = ChatStatus.thinking; // shows typing indicator in UI
     notifyListeners();
 
     // 2. ✅ Real Gemini response (async, replaces fake delay + rule-based)
@@ -70,7 +72,7 @@ class ChatProvider extends ChangeNotifier {
 
     // 3. Add AI reply bubble
     _addBotMessage(response);
-    _status           = ChatStatus.idle;
+    _status = ChatStatus.idle;
     _hasNewSuggestion = true;
     notifyListeners();
   }
@@ -88,18 +90,20 @@ class ChatProvider extends ChangeNotifier {
   void clearHistory() {
     _messages.clear();
     _hasNewSuggestion = false;
-    _service.resetChat();                        // ← fresh Gemini session too
+    _service.resetChat(); // ← fresh Gemini session too
     _addBotMessage('Chat cleared! How can I help you?');
     notifyListeners();
   }
 
   // ── Internal helper (unchanged) ───────────────────────────────────────────
   void _addBotMessage(String text) {
-    _messages.add(ChatMessage(
-      id:        '${DateTime.now().millisecondsSinceEpoch}_bot',
-      text:      text,
-      isUser:    false,
-      timestamp: DateTime.now(),
-    ));
+    _messages.add(
+      ChatMessage(
+        id: '${DateTime.now().millisecondsSinceEpoch}_bot',
+        text: text,
+        isUser: false,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 }

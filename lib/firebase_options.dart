@@ -24,42 +24,42 @@ class DefaultFirebaseOptions {
 
   // ── Web ───────────────────────────────────────────────────────────────────
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey:            'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
-    appId:             '1:179239323540:web:02d6a5f984b6d4652ab181',
+    apiKey: 'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
+    appId: '1:179239323540:web:02d6a5f984b6d4652ab181',
     messagingSenderId: '179239323540',
-    projectId:         'lowcodeapp-1a7eb',
-    authDomain:        'lowcodeapp-1a7eb.firebaseapp.com',
-    storageBucket:     'lowcodeapp-1a7eb.firebasestorage.app',
-    measurementId:     'G-2RQJYNX9RP',
+    projectId: 'lowcodeapp-1a7eb',
+    authDomain: 'lowcodeapp-1a7eb.firebaseapp.com',
+    storageBucket: 'lowcodeapp-1a7eb.firebasestorage.app',
+    measurementId: 'G-2RQJYNX9RP',
   );
 
   // ── Android ───────────────────────────────────────────────────────────────
   // Replace with values from your google-services.json
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey:            'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
-    appId:             '1:179239323540:android:02d6a5f984b6d4652ab181',
+    apiKey: 'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
+    appId: '1:179239323540:android:02d6a5f984b6d4652ab181',
     messagingSenderId: '179239323540',
-    projectId:         'lowcodeapp-1a7eb',
-    storageBucket:     'lowcodeapp-1a7eb.firebasestorage.app',
+    projectId: 'lowcodeapp-1a7eb',
+    storageBucket: 'lowcodeapp-1a7eb.firebasestorage.app',
   );
 
   // ── iOS ───────────────────────────────────────────────────────────────────
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey:            'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
-    appId:             '1:179239323540:ios:02d6a5f984b6d4652ab181',
+    apiKey: 'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
+    appId: '1:179239323540:ios:02d6a5f984b6d4652ab181',
     messagingSenderId: '179239323540',
-    projectId:         'lowcodeapp-1a7eb',
-    storageBucket:     'lowcodeapp-1a7eb.firebasestorage.app',
-    iosBundleId:       'com.gayathri.low_code_app',
+    projectId: 'lowcodeapp-1a7eb',
+    storageBucket: 'lowcodeapp-1a7eb.firebasestorage.app',
+    iosBundleId: 'com.gayathri.low_code_app',
   );
 
   // ── macOS ─────────────────────────────────────────────────────────────────
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey:            'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
-    appId:             '1:179239323540:ios:02d6a5f984b6d4652ab181',
+    apiKey: 'AIzaSyCoYr7YwA01eRQ2PjTF2gE2n4s4JkGjS7k',
+    appId: '1:179239323540:ios:02d6a5f984b6d4652ab181',
     messagingSenderId: '179239323540',
-    projectId:         'lowcodeapp-1a7eb',
-    storageBucket:     'lowcodeapp-1a7eb.firebasestorage.app',
-    iosBundleId:       'com.gayathri.low_code_app',
+    projectId: 'lowcodeapp-1a7eb',
+    storageBucket: 'lowcodeapp-1a7eb.firebasestorage.app',
+    iosBundleId: 'com.gayathri.low_code_app',
   );
 }

@@ -14,51 +14,63 @@ class AdminTemplates extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        AdminSectionHeader(
-          title: 'Templates',
-          action: ElevatedButton.icon(
-            onPressed: () => _showCreateDialog(context),
-            icon:  const Icon(Icons.add, size: 16),
-            label: const Text('New Template'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              textStyle: const TextStyle(fontSize: 12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AdminSectionHeader(
+            title: 'Templates',
+            action: ElevatedButton.icon(
+              onPressed: () => _showCreateDialog(context),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('New Template'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                textStyle: const TextStyle(fontSize: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: service.streamTemplates(),
-            builder: (_, snap) {
-              if (!snap.hasData) {
-                return const Center(child:
-                    CircularProgressIndicator(color: AppTheme.primary));
-              }
-              final templates = snap.data!;
-              if (templates.isEmpty) {
-                return const Center(child: Text('No templates yet',
-                    style: TextStyle(color: AppTheme.textMuted)));
-              }
-              return GridView.builder(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 280,
-                  childAspectRatio:   1.2,
-                  crossAxisSpacing:   12,
-                  mainAxisSpacing:    12,
-                ),
-                itemCount: templates.length,
-                itemBuilder: (_, i) => _TemplateCard(
-                    t: templates[i], service: service),
-              );
-            },
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: service.streamTemplates(),
+              builder: (_, snap) {
+                if (!snap.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppTheme.primary),
+                  );
+                }
+                final templates = snap.data!;
+                if (templates.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No templates yet',
+                      style: TextStyle(color: AppTheme.textMuted),
+                    ),
+                  );
+                }
+                return GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 280,
+                    childAspectRatio: 1.2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: templates.length,
+                  itemBuilder: (_, i) =>
+                      _TemplateCard(t: templates[i], service: service),
+                );
+              },
+            ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -69,25 +81,30 @@ class AdminTemplates extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.darkCard,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Text('New Template',
-            style: TextStyle(color: AppTheme.textPrimary)),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          _Field(ctrl: nameCtrl, hint: 'Template name'),
-          const SizedBox(height: 10),
-          _Field(ctrl: descCtrl, hint: 'Description'),
-        ]),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'New Template',
+          style: TextStyle(color: AppTheme.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _Field(ctrl: nameCtrl, hint: 'Template name'),
+            const SizedBox(height: 10),
+            _Field(ctrl: descCtrl, hint: 'Description'),
+          ],
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
               service.createTemplate({
-                'name':        nameCtrl.text.trim(),
+                'name': nameCtrl.text.trim(),
                 'description': descCtrl.text.trim(),
-                'category':    'custom',
+                'category': 'custom',
               });
               Navigator.pop(context);
             },
@@ -101,7 +118,7 @@ class AdminTemplates extends StatelessWidget {
 
 class _TemplateCard extends StatelessWidget {
   final Map<String, dynamic> t;
-  final AdminService         service;
+  final AdminService service;
   const _TemplateCard({required this.t, required this.service});
 
   @override
@@ -109,50 +126,69 @@ class _TemplateCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color:        AppTheme.darkCard,
+        color: AppTheme.darkCard,
         borderRadius: BorderRadius.circular(14),
-        border:       Border.all(color: AppTheme.darkBorder),
+        border: Border.all(color: AppTheme.darkBorder),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color:        Colors.blueAccent.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.layers_rounded,
+                  color: Colors.blueAccent,
+                  size: 18,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => service.deleteTemplate(t['id']),
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.redAccent,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            t['name']?.toString() ?? 'Unnamed',
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
             ),
-            child: const Icon(Icons.layers_rounded,
-                color: Colors.blueAccent, size: 18),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t['description']?.toString() ?? '',
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const Spacer(),
-          GestureDetector(
-            onTap: () => service.deleteTemplate(t['id']),
-            child: Container(
-              width: 26, height: 26,
-              decoration: BoxDecoration(
-                color:        Colors.redAccent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(Icons.delete_outline,
-                  color: Colors.redAccent, size: 14),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 10),
-        Text(t['name']?.toString() ?? 'Unnamed',
-            style: const TextStyle(
-                color:      AppTheme.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize:   13),
-            maxLines: 1, overflow: TextOverflow.ellipsis),
-        const SizedBox(height: 4),
-        Text(t['description']?.toString() ?? '',
-            style: const TextStyle(
-                color: AppTheme.textMuted, fontSize: 11),
-            maxLines: 2, overflow: TextOverflow.ellipsis),
-        const Spacer(),
-        StatusBadge(t['category']?.toString() ?? 'custom'),
-      ]),
+          StatusBadge(t['category']?.toString() ?? 'custom'),
+        ],
+      ),
     );
   }
 }

@@ -25,14 +25,13 @@ class DraggableComponent extends StatefulWidget {
     required this.onDelete,
     required this.onDuplicate,
   });
-
   @override
   State<DraggableComponent> createState() => _DraggableComponentState();
 }
 
 class _DraggableComponentState extends State<DraggableComponent> {
   Offset _dragStart = Offset.zero;
-  Offset _posStart  = Offset.zero;
+  Offset _posStart = Offset.zero;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +40,7 @@ class _DraggableComponentState extends State<DraggableComponent> {
       onPanStart: (details) {
         widget.onTap(); // auto-select on drag
         _dragStart = details.globalPosition;
-        _posStart  = Offset(widget.model.x, widget.model.y);
+        _posStart = Offset(widget.model.x, widget.model.y);
       },
       onPanUpdate: (details) {
         final delta = details.globalPosition - _dragStart;
@@ -53,7 +52,6 @@ class _DraggableComponentState extends State<DraggableComponent> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-
           // ── Main widget ────────────────────────────────────────────────
           AnimatedContainer(
             duration: const Duration(milliseconds: 150),
@@ -62,7 +60,11 @@ class _DraggableComponentState extends State<DraggableComponent> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.primary, width: 2),
                     boxShadow: [
-                      BoxShadow(color: AppTheme.primary.withOpacity(0.25), blurRadius: 10, spreadRadius: 1),
+                      BoxShadow(
+                        color: AppTheme.primary.withOpacity(0.25),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
                     ],
                   )
                 : const BoxDecoration(),
@@ -71,12 +73,13 @@ class _DraggableComponentState extends State<DraggableComponent> {
 
           // ── Selection handles (only when selected) ─────────────────────
           if (widget.isSelected) ...[
-
             // Top-left: drag handle indicator
             Positioned(
-              top: -6, left: -6,
+              top: -6,
+              left: -6,
               child: Container(
-                width: 12, height: 12,
+                width: 12,
+                height: 12,
                 decoration: const BoxDecoration(
                   color: AppTheme.primary,
                   shape: BoxShape.circle,
@@ -86,9 +89,11 @@ class _DraggableComponentState extends State<DraggableComponent> {
 
             // Top-right: drag handle
             Positioned(
-              top: -6, right: -6,
+              top: -6,
+              right: -6,
               child: Container(
-                width: 12, height: 12,
+                width: 12,
+                height: 12,
                 decoration: const BoxDecoration(
                   color: AppTheme.primary,
                   shape: BoxShape.circle,
@@ -98,9 +103,11 @@ class _DraggableComponentState extends State<DraggableComponent> {
 
             // Bottom-left: drag handle
             Positioned(
-              bottom: -6, left: -6,
+              bottom: -6,
+              left: -6,
               child: Container(
-                width: 12, height: 12,
+                width: 12,
+                height: 12,
                 decoration: const BoxDecoration(
                   color: AppTheme.primary,
                   shape: BoxShape.circle,
@@ -110,9 +117,11 @@ class _DraggableComponentState extends State<DraggableComponent> {
 
             // Bottom-right: drag handle
             Positioned(
-              bottom: -6, right: -6,
+              bottom: -6,
+              right: -6,
               child: Container(
-                width: 12, height: 12,
+                width: 12,
+                height: 12,
                 decoration: const BoxDecoration(
                   color: AppTheme.primary,
                   shape: BoxShape.circle,
@@ -149,13 +158,37 @@ class _FloatingToolbar extends StatelessWidget {
       color: AppTheme.darkCard,
       borderRadius: BorderRadius.circular(8),
       border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
-      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.3),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
     ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      _ToolBtn(icon: Icons.copy_outlined, color: AppTheme.textMuted, onTap: onDuplicate, tooltip: 'Duplicate'),
-      Container(width: 1, height: 16, color: AppTheme.darkBorder, margin: const EdgeInsets.symmetric(horizontal: 2)),
-      _ToolBtn(icon: Icons.delete_outline, color: AppTheme.accent, onTap: onDelete, tooltip: 'Delete'),
-    ]),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ToolBtn(
+          icon: Icons.copy_outlined,
+          color: AppTheme.textMuted,
+          onTap: onDuplicate,
+          tooltip: 'Duplicate',
+        ),
+        Container(
+          width: 1,
+          height: 16,
+          color: AppTheme.darkBorder,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+        ),
+        _ToolBtn(
+          icon: Icons.delete_outline,
+          color: AppTheme.accent,
+          onTap: onDelete,
+          tooltip: 'Delete',
+        ),
+      ],
+    ),
   );
 }
 
@@ -164,7 +197,12 @@ class _ToolBtn extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final String tooltip;
-  const _ToolBtn({required this.icon, required this.color, required this.onTap, required this.tooltip});
+  const _ToolBtn({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    required this.tooltip,
+  });
 
   @override
   Widget build(BuildContext context) => Tooltip(
@@ -207,7 +245,10 @@ class CanvasDragTarget extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           decoration: isDraggingOver
               ? BoxDecoration(
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.5), width: 2),
+                  border: Border.all(
+                    color: AppTheme.primary.withOpacity(0.5),
+                    width: 2,
+                  ),
                   borderRadius: BorderRadius.circular(4),
                   color: AppTheme.primary.withOpacity(0.05),
                 )

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path/path.dart' as p;
 
@@ -13,9 +14,13 @@ class StorageService {
     required String folder,
     String? customFileName,
   }) async {
-    final ext      = p.extension(file.path);
-    final fileName = customFileName ?? '${DateTime.now().millisecondsSinceEpoch}$ext';
-    final ref      = _storage.ref('users/$userId/$folder/$fileName');
+    if (kIsWeb) {
+      throw UnsupportedError('File upload from disk not supported on web');
+    }
+    final ext = p.extension(file.path);
+    final fileName =
+        customFileName ?? '${DateTime.now().millisecondsSinceEpoch}$ext';
+    final ref = _storage.ref('users/$userId/$folder/$fileName');
 
     final task = await ref.putFile(
       file,
@@ -32,8 +37,9 @@ class StorageService {
     required String extension,
     String? customFileName,
   }) async {
-    final fileName = customFileName ?? '${DateTime.now().millisecondsSinceEpoch}.$extension';
-    final ref      = _storage.ref('users/$userId/$folder/$fileName');
+    final fileName =
+        customFileName ?? '${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final ref = _storage.ref('users/$userId/$folder/$fileName');
 
     final task = await ref.putData(
       bytes,
@@ -48,9 +54,15 @@ class StorageService {
     required File file,
     required String platform,
   }) async {
-    final ext  = p.extension(file.path);
-    final ref  = _storage.ref('apps/$projectId/${platform}_export$ext');
-    final task = await ref.putFile(file, SettableMetadata(contentType: 'application/octet-stream'));
+    if (kIsWeb) {
+      throw UnsupportedError('File upload from disk not supported on web');
+    }
+    final ext = p.extension(file.path);
+    final ref = _storage.ref('apps/$projectId/${platform}_export$ext');
+    final task = await ref.putFile(
+      file,
+      SettableMetadata(contentType: 'application/octet-stream'),
+    );
     return await task.ref.getDownloadURL();
   }
 
@@ -78,9 +90,12 @@ class StorageService {
   }
 
   // ── Delete all files in a folder ─────────────────────────────────────────
-  Future<void> deleteFolder({required String userId, required String folder}) async {
+  Future<void> deleteFolder({
+    required String userId,
+    required String folder,
+  }) async {
     try {
-      final ref    = _storage.ref('users/$userId/$folder');
+      final ref = _storage.ref('users/$userId/$folder');
       final result = await ref.listAll();
       await Future.wait(result.items.map((item) => item.delete()));
     } catch (_) {}
@@ -103,10 +118,14 @@ class StorageService {
     String? customFileName,
     required void Function(String downloadUrl) onComplete,
   }) async* {
-    final ext      = p.extension(file.path);
-    final fileName = customFileName ?? '${DateTime.now().millisecondsSinceEpoch}$ext';
-    final ref      = _storage.ref('users/$userId/$folder/$fileName');
-    final task     = ref.putFile(file, SettableMetadata(contentType: _contentType(ext)));
+    final ext = p.extension(file.path);
+    final fileName =
+        customFileName ?? '${DateTime.now().millisecondsSinceEpoch}$ext';
+    final ref = _storage.ref('users/$userId/$folder/$fileName');
+    final task = ref.putFile(
+      file,
+      SettableMetadata(contentType: _contentType(ext)),
+    );
 
     await for (final snapshot in task.snapshotEvents) {
       final progress = snapshot.bytesTransferred / snapshot.totalBytes;
@@ -122,14 +141,22 @@ class StorageService {
   String _contentType(String ext) {
     switch (ext.toLowerCase()) {
       case '.jpg':
-      case '.jpeg': return 'image/jpeg';
-      case '.png':  return 'image/png';
-      case '.gif':  return 'image/gif';
-      case '.webp': return 'image/webp';
-      case '.pdf':  return 'application/pdf';
-      case '.zip':  return 'application/zip';
-      case '.json': return 'application/json';
-      default:      return 'application/octet-stream';
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.gif':
+        return 'image/gif';
+      case '.webp':
+        return 'image/webp';
+      case '.pdf':
+        return 'application/pdf';
+      case '.zip':
+        return 'application/zip';
+      case '.json':
+        return 'application/json';
+      default:
+        return 'application/octet-stream';
     }
   }
 }

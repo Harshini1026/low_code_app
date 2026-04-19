@@ -45,28 +45,67 @@ class AppTemplates {
   AppTemplates._();
 
   static const List<String> categories = [
-    'All', 'Business', 'Education', 'Food', 'Health', 'Media', 'Custom',
+    'All',
+    'Business',
+    'Education',
+    'Food',
+    'Health',
+    'Media',
+    'Custom',
   ];
 
   static final List<TemplateModel> all = [
-
     // ── E-Commerce ──────────────────────────────────────────────────────────
     TemplateModel(
       id: 'ecommerce',
       name: 'E-Commerce',
-      description: 'Full shopping app with products, cart, checkout & order tracking.',
+      description:
+          'Full shopping app with products, cart, checkout & order tracking.',
       emoji: '🛒',
       category: 'Business',
       primaryColor: const Color(0xFFFF6B35),
       secondaryColor: const Color(0xFFFF9F1C),
       emailAuth: true,
       googleAuth: true,
-      defaultScreens: ['Home', 'Products', 'Cart', 'Checkout', 'Orders', 'Profile'],
+      defaultScreens: [
+        'Home',
+        'Products',
+        'Cart',
+        'Checkout',
+        'Orders',
+        'Profile',
+      ],
       defaultTables: [
-        TemplateTable(name: 'Products',  fields: ['name', 'price', 'image', 'category', 'stock', 'description']),
-        TemplateTable(name: 'Orders',    fields: ['userId', 'items', 'total', 'status', 'address', 'created_at']),
-        TemplateTable(name: 'Cart',      fields: ['userId', 'productId', 'quantity']),
-        TemplateTable(name: 'Users',     fields: ['name', 'email', 'phone', 'address', 'created_at']),
+        TemplateTable(
+          name: 'Products',
+          fields: [
+            'name',
+            'price',
+            'image',
+            'category',
+            'stock',
+            'description',
+          ],
+        ),
+        TemplateTable(
+          name: 'Orders',
+          fields: [
+            'userId',
+            'items',
+            'total',
+            'status',
+            'address',
+            'created_at',
+          ],
+        ),
+        TemplateTable(
+          name: 'Cart',
+          fields: ['userId', 'productId', 'quantity'],
+        ),
+        TemplateTable(
+          name: 'Users',
+          fields: ['name', 'email', 'phone', 'address', 'created_at'],
+        ),
       ],
     ),
 
@@ -81,13 +120,35 @@ class AppTemplates {
       secondaryColor: const Color(0xFF2980B9),
       emailAuth: true,
       googleAuth: false,
-      defaultScreens: ['Dashboard', 'Attendance', 'Grades', 'Timetable', 'Notices', 'Profile'],
+      defaultScreens: [
+        'Dashboard',
+        'Attendance',
+        'Grades',
+        'Timetable',
+        'Notices',
+        'Profile',
+      ],
       defaultTables: [
-        TemplateTable(name: 'Students',   fields: ['name', 'rollNo', 'class', 'email', 'phone', 'parent']),
-        TemplateTable(name: 'Attendance', fields: ['studentId', 'date', 'status', 'subject']),
-        TemplateTable(name: 'Grades',     fields: ['studentId', 'subject', 'marks', 'grade', 'exam']),
-        TemplateTable(name: 'Notices',    fields: ['title', 'content', 'date', 'postedBy', 'priority']),
-        TemplateTable(name: 'Timetable',  fields: ['class', 'day', 'period', 'subject', 'teacher']),
+        TemplateTable(
+          name: 'Students',
+          fields: ['name', 'rollNo', 'class', 'email', 'phone', 'parent'],
+        ),
+        TemplateTable(
+          name: 'Attendance',
+          fields: ['studentId', 'date', 'status', 'subject'],
+        ),
+        TemplateTable(
+          name: 'Grades',
+          fields: ['studentId', 'subject', 'marks', 'grade', 'exam'],
+        ),
+        TemplateTable(
+          name: 'Notices',
+          fields: ['title', 'content', 'date', 'postedBy', 'priority'],
+        ),
+        TemplateTable(
+          name: 'Timetable',
+          fields: ['class', 'day', 'period', 'subject', 'teacher'],
+        ),
       ],
     ),
 
@@ -95,7 +156,8 @@ class AppTemplates {
     TemplateModel(
       id: 'food',
       name: 'Food Delivery',
-      description: 'Restaurant menu, ordering system and real-time delivery tracking.',
+      description:
+          'Restaurant menu, ordering system and real-time delivery tracking.',
       emoji: '🍔',
       category: 'Food',
       primaryColor: const Color(0xFFE74C3C),
@@ -104,10 +166,29 @@ class AppTemplates {
       googleAuth: true,
       defaultScreens: ['Home', 'Menu', 'Cart', 'Order', 'Track', 'Profile'],
       defaultTables: [
-        TemplateTable(name: 'Menu',       fields: ['name', 'price', 'image', 'category', 'description', 'available']),
-        TemplateTable(name: 'Orders',     fields: ['userId', 'items', 'total', 'status', 'address', 'rider']),
-        TemplateTable(name: 'Restaurants', fields: ['name', 'logo', 'address', 'rating', 'cuisine', 'open']),
-        TemplateTable(name: 'Reviews',    fields: ['userId', 'restaurantId', 'rating', 'comment', 'date']),
+        TemplateTable(
+          name: 'Menu',
+          fields: [
+            'name',
+            'price',
+            'image',
+            'category',
+            'description',
+            'available',
+          ],
+        ),
+        TemplateTable(
+          name: 'Orders',
+          fields: ['userId', 'items', 'total', 'status', 'address', 'rider'],
+        ),
+        TemplateTable(
+          name: 'Restaurants',
+          fields: ['name', 'logo', 'address', 'rating', 'cuisine', 'open'],
+        ),
+        TemplateTable(
+          name: 'Reviews',
+          fields: ['userId', 'restaurantId', 'rating', 'comment', 'date'],
+        ),
       ],
     ),
 
@@ -122,12 +203,38 @@ class AppTemplates {
       secondaryColor: const Color(0xFF8E44AD),
       emailAuth: true,
       googleAuth: true,
-      defaultScreens: ['Dashboard', 'Contacts', 'Leads', 'Tasks', 'Reports', 'Settings'],
+      defaultScreens: [
+        'Dashboard',
+        'Contacts',
+        'Leads',
+        'Tasks',
+        'Reports',
+        'Settings',
+      ],
       defaultTables: [
-        TemplateTable(name: 'Contacts', fields: ['name', 'email', 'phone', 'company', 'status', 'source']),
-        TemplateTable(name: 'Leads',    fields: ['contactId', 'value', 'stage', 'assignee', 'closeDate']),
-        TemplateTable(name: 'Tasks',    fields: ['title', 'assignee', 'dueDate', 'status', 'priority', 'notes']),
-        TemplateTable(name: 'Notes',    fields: ['contactId', 'content', 'createdBy', 'created_at']),
+        TemplateTable(
+          name: 'Contacts',
+          fields: ['name', 'email', 'phone', 'company', 'status', 'source'],
+        ),
+        TemplateTable(
+          name: 'Leads',
+          fields: ['contactId', 'value', 'stage', 'assignee', 'closeDate'],
+        ),
+        TemplateTable(
+          name: 'Tasks',
+          fields: [
+            'title',
+            'assignee',
+            'dueDate',
+            'status',
+            'priority',
+            'notes',
+          ],
+        ),
+        TemplateTable(
+          name: 'Notes',
+          fields: ['contactId', 'content', 'createdBy', 'created_at'],
+        ),
       ],
     ),
 
@@ -142,12 +249,46 @@ class AppTemplates {
       secondaryColor: const Color(0xFF00A67E),
       emailAuth: true,
       googleAuth: true,
-      defaultScreens: ['Dashboard', 'Workouts', 'Nutrition', 'Progress', 'Goals', 'Profile'],
+      defaultScreens: [
+        'Dashboard',
+        'Workouts',
+        'Nutrition',
+        'Progress',
+        'Goals',
+        'Profile',
+      ],
       defaultTables: [
-        TemplateTable(name: 'Workouts',  fields: ['userId', 'name', 'date', 'duration', 'calories', 'exercises']),
-        TemplateTable(name: 'Exercises', fields: ['name', 'category', 'sets', 'reps', 'weight', 'notes']),
-        TemplateTable(name: 'Nutrition', fields: ['userId', 'date', 'meal', 'calories', 'protein', 'carbs', 'fat']),
-        TemplateTable(name: 'Progress',  fields: ['userId', 'date', 'weight', 'bodyFat', 'chest', 'waist']),
+        TemplateTable(
+          name: 'Workouts',
+          fields: [
+            'userId',
+            'name',
+            'date',
+            'duration',
+            'calories',
+            'exercises',
+          ],
+        ),
+        TemplateTable(
+          name: 'Exercises',
+          fields: ['name', 'category', 'sets', 'reps', 'weight', 'notes'],
+        ),
+        TemplateTable(
+          name: 'Nutrition',
+          fields: [
+            'userId',
+            'date',
+            'meal',
+            'calories',
+            'protein',
+            'carbs',
+            'fat',
+          ],
+        ),
+        TemplateTable(
+          name: 'Progress',
+          fields: ['userId', 'date', 'weight', 'bodyFat', 'chest', 'waist'],
+        ),
       ],
     ),
 
@@ -155,19 +296,47 @@ class AppTemplates {
     TemplateModel(
       id: 'blog',
       name: 'Blog',
-      description: 'Publish articles, manage categories and engage readers with comments.',
+      description:
+          'Publish articles, manage categories and engage readers with comments.',
       emoji: '📰',
       category: 'Media',
       primaryColor: const Color(0xFFF39C12),
       secondaryColor: const Color(0xFFE67E22),
       emailAuth: true,
       googleAuth: true,
-      defaultScreens: ['Home', 'Articles', 'Article Detail', 'Categories', 'Bookmarks', 'Profile'],
+      defaultScreens: [
+        'Home',
+        'Articles',
+        'Article Detail',
+        'Categories',
+        'Bookmarks',
+        'Profile',
+      ],
       defaultTables: [
-        TemplateTable(name: 'Articles',   fields: ['title', 'content', 'image', 'authorId', 'category', 'tags', 'published']),
-        TemplateTable(name: 'Categories', fields: ['name', 'slug', 'color', 'icon']),
-        TemplateTable(name: 'Comments',   fields: ['articleId', 'userId', 'content', 'likes', 'created_at']),
-        TemplateTable(name: 'Bookmarks',  fields: ['userId', 'articleId', 'saved_at']),
+        TemplateTable(
+          name: 'Articles',
+          fields: [
+            'title',
+            'content',
+            'image',
+            'authorId',
+            'category',
+            'tags',
+            'published',
+          ],
+        ),
+        TemplateTable(
+          name: 'Categories',
+          fields: ['name', 'slug', 'color', 'icon'],
+        ),
+        TemplateTable(
+          name: 'Comments',
+          fields: ['articleId', 'userId', 'content', 'likes', 'created_at'],
+        ),
+        TemplateTable(
+          name: 'Bookmarks',
+          fields: ['userId', 'articleId', 'saved_at'],
+        ),
       ],
     ),
 
@@ -175,7 +344,8 @@ class AppTemplates {
     TemplateModel(
       id: 'blank',
       name: 'Start from Scratch',
-      description: 'Blank canvas — build anything you imagine from the ground up.',
+      description:
+          'Blank canvas — build anything you imagine from the ground up.',
       emoji: '✨',
       category: 'Custom',
       primaryColor: const Color(0xFF6C63FF),
@@ -188,8 +358,11 @@ class AppTemplates {
   ];
 
   static TemplateModel? findById(String id) {
-    try { return all.firstWhere((t) => t.id == id); }
-    catch (_) { return null; }
+    try {
+      return all.firstWhere((t) => t.id == id);
+    } catch (_) {
+      return null;
+    }
   }
 
   static List<TemplateModel> byCategory(String category) {
