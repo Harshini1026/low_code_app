@@ -59,6 +59,23 @@ class ProjectModel {
     'publishedUrl': publishedUrl,
   };
 
+  /// Convert to JSON-serializable format for local storage
+  /// Uses ISO strings for timestamps instead of Firestore Timestamp objects
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'userId': userId,
+    'templateId': templateId,
+    'templateName': templateName,
+    'screens': screens.map((s) => s.toMap()).toList(),
+    'theme': theme.toMap(),
+    'backendConfig': backendConfig.toMap(),
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'status': status,
+    'publishedUrl': publishedUrl,
+  };
+
   ProjectModel copyWith({
     String? name,
     List<AppScreen>? screens,
@@ -84,6 +101,29 @@ class ProjectTheme {
   final String primaryColor, secondaryColor, backgroundColor, fontFamily;
   final double borderRadius;
   final bool isDarkMode;
+
+  // App Style presets
+  static const Map<String, Map<String, String>> colorPresets = {
+    'Blue': {'primary': '#4A90E2', 'secondary': '#357ABD', 'accent': '#2A5AA0'},
+    'Purple': {
+      'primary': '#7B61FF',
+      'secondary': '#6B51D5',
+      'accent': '#5B41C5',
+    },
+    'Orange': {
+      'primary': '#FF8C42',
+      'secondary': '#E67E31',
+      'accent': '#CC6A20',
+    },
+    'Teal': {'primary': '#2EC4B6', 'secondary': '#1FA39A', 'accent': '#158280'},
+    'Dark': {'primary': '#1E1E2F', 'secondary': '#16213E', 'accent': '#0F3460'},
+    'Green': {
+      'primary': '#00C896',
+      'secondary': '#009973',
+      'accent': '#007A5E',
+    },
+  };
+
   const ProjectTheme({
     this.primaryColor = '#00C896',
     this.secondaryColor = '#6C63FF',
@@ -92,6 +132,7 @@ class ProjectTheme {
     this.borderRadius = 12.0,
     this.isDarkMode = false,
   });
+
   factory ProjectTheme.fromMap(Map<String, dynamic> m) => ProjectTheme(
     primaryColor: m['primaryColor'] ?? '#00C896',
     secondaryColor: m['secondaryColor'] ?? '#6C63FF',
@@ -100,6 +141,7 @@ class ProjectTheme {
     borderRadius: (m['borderRadius'] as num?)?.toDouble() ?? 12.0,
     isDarkMode: m['isDarkMode'] ?? false,
   );
+
   Map<String, dynamic> toMap() => {
     'primaryColor': primaryColor,
     'secondaryColor': secondaryColor,
@@ -108,6 +150,12 @@ class ProjectTheme {
     'borderRadius': borderRadius,
     'isDarkMode': isDarkMode,
   };
+
+  // Get dark mode text color
+  String get textColorHex => isDarkMode ? '#F0F0F0' : '#1A1A1A';
+  String get textMutedHex => isDarkMode ? '#A0A0A0' : '#666666';
+  String get surfaceColorHex => isDarkMode ? '#2A2A2A' : '#FFFFFF';
+  String get surfaceDarkHex => isDarkMode ? '#1F1F1F' : '#F5F5F5';
 }
 
 class BackendConfig {

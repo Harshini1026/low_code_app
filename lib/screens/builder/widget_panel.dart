@@ -16,9 +16,14 @@ const _categories = {
     {'type': 'image', 'label': 'Image', 'icon': '🖼', 'color': 0xFF3498DB},
     {'type': 'icon', 'label': 'Icon', 'icon': '⭐', 'color': 0xFFF39C12},
     {'type': 'divider', 'label': 'Divider', 'icon': '—', 'color': 0xFF95A5A6},
-    {'type': 'spacer', 'label': 'Spacer', 'icon': '⬍', 'color': 0xFFBDC3C7},
     {'type': 'badge', 'label': 'Badge', 'icon': '🔴', 'color': 0xFFE74C3C},
     {'type': 'chip', 'label': 'Chip', 'icon': '🏷', 'color': 0xFF16A085},
+    {
+      'type': 'circleavatar',
+      'label': 'Circle Avatar',
+      'icon': '⭕',
+      'color': 0xFF9B59B6,
+    },
     {
       'type': 'container',
       'label': 'Container',
@@ -34,7 +39,6 @@ const _categories = {
       'icon': '📄',
       'color': 0xFFC0392B,
     },
-    {'type': 'search', 'label': 'Search', 'icon': '🔍', 'color': 0xFFD35400},
     {'type': 'dropdown', 'label': 'Dropdown', 'icon': '▼', 'color': 0xFF9B59B6},
     {
       'type': 'multiselect',
@@ -51,6 +55,18 @@ const _categories = {
     {'type': 'checkbox', 'label': 'Checkbox', 'icon': '☑', 'color': 0xFF1ABC9C},
     {'type': 'radio', 'label': 'Radio', 'icon': '⭕', 'color': 0xFF3498DB},
     {'type': 'switch_w', 'label': 'Switch', 'icon': '🔄', 'color': 0xFF2ECC71},
+    {
+      'type': 'switch_listtile',
+      'label': 'Switch ListTile',
+      'icon': '🔄',
+      'color': 0xFF2ECC71,
+    },
+    {
+      'type': 'checkbox_listtile',
+      'label': 'Checkbox ListTile',
+      'icon': '☑',
+      'color': 0xFF1ABC9C,
+    },
     {'type': 'slider', 'label': 'Slider', 'icon': '⊲', 'color': 0xFFF1C40F},
     {
       'type': 'rangeslider',
@@ -63,23 +79,37 @@ const _categories = {
   'Layout': [
     {'type': 'card', 'label': 'Card', 'icon': '🃏', 'color': 0xFF6C63FF},
     {'type': 'padding', 'label': 'Padding', 'icon': '⬛', 'color': 0xFF8E44AD},
-    {
-      'type': 'expanded',
-      'label': 'Expanded',
-      'icon': '📏',
-      'color': 0xFF34495E,
-    },
-    {'type': 'flexible', 'label': 'Flexible', 'icon': '⤢', 'color': 0xFF95A5A6},
     {'type': 'row', 'label': 'Row', 'icon': '↔', 'color': 0xFFE67E22},
     {'type': 'column', 'label': 'Column', 'icon': '↨', 'color': 0xFFC0392B},
-    {'type': 'stack', 'label': 'Stack', 'icon': '◉', 'color': 0xFF34495E},
     {'type': 'list', 'label': 'List', 'icon': '📋', 'color': 0xFF00C896},
     {'type': 'grid', 'label': 'Grid', 'icon': '⊞', 'color': 0xFFFF6B35},
-    {'type': 'wrapper', 'label': 'Wrap', 'icon': '≋', 'color': 0xFF2980B9},
-    {'type': 'navbar', 'label': 'Nav Bar', 'icon': '🧭', 'color': 0xFF2C3E50},
+    {
+      'type': 'navbar',
+      'label': 'Bottom Nav',
+      'icon': '🧭',
+      'color': 0xFF2C3E50,
+    },
     {'type': 'appbar', 'label': 'App Bar', 'icon': '📊', 'color': 0xFF16A085},
     {'type': 'tabs', 'label': 'Tabs', 'icon': '📑', 'color': 0xFF8E44AD},
     {'type': 'stepper', 'label': 'Stepper', 'icon': '1️⃣', 'color': 0xFF27AE60},
+    {
+      'type': 'listview',
+      'label': 'ListView',
+      'icon': '📑',
+      'color': 0xFF1ABC9C,
+    },
+    {
+      'type': 'listtile',
+      'label': 'ListTile',
+      'icon': '📄',
+      'color': 0xFF3498DB,
+    },
+    {
+      'type': 'singlechildscrollview',
+      'label': 'Scroll View',
+      'icon': '↕',
+      'color': 0xFF1E90FF,
+    },
   ],
   'Input Controls': [
     {'type': 'rating', 'label': 'Rating', 'icon': '⭐', 'color': 0xFFFDB913},
@@ -209,30 +239,102 @@ const _categories = {
   ],
   'Advanced': [
     {
-      'type': 'accordion',
-      'label': 'Accordion',
-      'icon': '▼',
+      'type': 'gesture_detector',
+      'label': 'GestureDetector',
+      'icon': '👆',
       'color': 0xFF2980B9,
     },
-    {'type': 'timeline', 'label': 'Timeline', 'icon': '⟝', 'color': 0xFF27AE60},
-    {'type': 'table', 'label': 'Data Table', 'icon': '🔲', 'color': 0xFF34495E},
+  ],
+  'Icons': [
     {
-      'type': 'segcontrol',
-      'label': 'Segment Control',
-      'icon': '⊞',
-      'color': 0xFFE67E22,
+      'type': 'icon_home',
+      'label': 'Home Icon',
+      'icon': '🏠',
+      'color': 0xFF3498DB,
     },
     {
-      'type': 'emptystate',
-      'label': 'Empty State',
-      'icon': '📭',
+      'type': 'icon_search',
+      'label': 'Search Icon',
+      'icon': '🔍',
+      'color': 0xFF1ABC9C,
+    },
+    {
+      'type': 'icon_settings',
+      'label': 'Settings Icon',
+      'icon': '⚙️',
       'color': 0xFF95A5A6,
     },
     {
-      'type': 'errorstate',
-      'label': 'Error State',
-      'icon': '❌',
+      'type': 'icon_user',
+      'label': 'User Icon',
+      'icon': '👤',
+      'color': 0xFF9B59B6,
+    },
+    {
+      'type': 'icon_favorite',
+      'label': 'Favorite Icon',
+      'icon': '❤️',
       'color': 0xFFE74C3C,
+    },
+    {
+      'type': 'icon_star',
+      'label': 'Star Icon',
+      'icon': '⭐',
+      'color': 0xFFF39C12,
+    },
+    {
+      'type': 'icon_notification',
+      'label': 'Notification Icon',
+      'icon': '🔔',
+      'color': 0xFFE67E22,
+    },
+    {
+      'type': 'icon_menu',
+      'label': 'Menu Icon',
+      'icon': '☰',
+      'color': 0xFF2C3E50,
+    },
+    {
+      'type': 'icon_camera',
+      'label': 'Camera Icon',
+      'icon': '📷',
+      'color': 0xFF3498DB,
+    },
+    {
+      'type': 'icon_chat',
+      'label': 'Chat Icon',
+      'icon': '💬',
+      'color': 0xFF27AE60,
+    },
+    {
+      'type': 'icon_lock',
+      'label': 'Lock Icon',
+      'icon': '🔒',
+      'color': 0xFFC0392B,
+    },
+    {
+      'type': 'icon_location',
+      'label': 'Location Icon',
+      'icon': '📍',
+      'color': 0xFFE74C3C,
+    },
+    {
+      'type': 'icon_shopping_cart',
+      'label': 'Shopping Cart Icon',
+      'icon': '🛒',
+      'color': 0xFF16A085,
+    },
+    {
+      'type': 'icon_phone',
+      'label': 'Phone Icon',
+      'icon': '☎️',
+      'color': 0xFF2980B9,
+    },
+    {
+      'type': 'icon_email',
+      'label': 'Email Icon',
+      'icon': '✉️',
+      'color': 0xFF8E44AD,
     },
   ],
 };
@@ -258,9 +360,10 @@ class _WidgetPanelState extends State<WidgetPanel> {
               _search.toLowerCase(),
             ),
           )
-          .toList();
+          .toList()
+          .cast<Map>();
     }
-    return _categories[_activeCategory] ?? [];
+    return (_categories[_activeCategory] ?? []).cast<Map>();
   }
 
   @override
@@ -269,7 +372,7 @@ class _WidgetPanelState extends State<WidgetPanel> {
       children: [
         // Search bar
         Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.only(bottom: 12),
           child: TextField(
             onChanged: (v) => setState(() => _search = v),
             style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
@@ -292,39 +395,50 @@ class _WidgetPanelState extends State<WidgetPanel> {
           ),
         ),
 
+        // Spacing between search and tabs
+        if (_search.isEmpty) const SizedBox(height: 10),
+
         // Category tabs (hidden when searching)
         if (_search.isEmpty)
           SizedBox(
             height: 34,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: EdgeInsets.zero,
               children: _categories.keys.map((cat) {
                 final active = cat == _activeCategory;
                 return GestureDetector(
                   onTap: () => setState(() => _activeCategory = cat),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 6),
+                    margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 4,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: active
-                          ? AppTheme.primary.withOpacity(0.2)
+                          ? AppTheme.primary.withOpacity(0.15)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: active ? AppTheme.primary : AppTheme.darkBorder,
+                        color: active
+                            ? AppTheme.primary.withOpacity(0.5)
+                            : Colors.transparent,
                       ),
                     ),
-                    child: Text(
-                      cat,
-                      style: TextStyle(
-                        color: active ? AppTheme.primary : AppTheme.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                    child: Center(
+                      child: Text(
+                        cat,
+                        style: TextStyle(
+                          color: active ? AppTheme.primary : AppTheme.textMuted,
+                          fontSize: 12,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.visible,
+                        softWrap: false,
                       ),
                     ),
                   ),
@@ -333,12 +447,12 @@ class _WidgetPanelState extends State<WidgetPanel> {
             ),
           ),
 
-        const SizedBox(height: 8),
+        // Spacing between tabs and grid
+        if (_search.isEmpty) const SizedBox(height: 10),
 
         // Widget grid
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -352,50 +466,34 @@ class _WidgetPanelState extends State<WidgetPanel> {
               itemBuilder: (_, i) {
                 final w = _items[i];
                 final color = Color(w['color'] as int);
-                return Draggable<String>(
-                  data: w['type'] as String,
+                final widgetType = w['type'] as String;
+
+                // For these specific widgets, pass full Map data instead of just type string
+                final shouldPassMap =
+                    {
+                      'listtile',
+                      'switch_listtile',
+                      'checkbox_listtile',
+                      'gesture_detector',
+                      'listview',
+                    }.contains(widgetType) ||
+                    widgetType.startsWith('icon_');
+
+                return Draggable<Object>(
+                  data: shouldPassMap ? w : widgetType,
                   feedback: Material(
                     color: Colors.transparent,
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withOpacity(0.4),
-                            blurRadius: 12,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            w['icon'] as String,
-                            style: const TextStyle(fontSize: 24),
-                          ),
-                          Text(
-                            w['label'] as String,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _Tile(w, color, () {}, isSidebar: false),
                   ),
                   childWhenDragging: Opacity(
                     opacity: 0.4,
-                    child: _Tile(w, color, () {}),
+                    child: _Tile(w, color, () {}, isSidebar: true),
                   ),
                   child: _Tile(
                     w,
                     color,
                     () => widget.onAdd(w['type'] as String),
+                    isSidebar: false,
                   ),
                 );
               },
@@ -411,7 +509,8 @@ class _Tile extends StatefulWidget {
   final Map w;
   final Color color;
   final VoidCallback onTap;
-  const _Tile(this.w, this.color, this.onTap);
+  final bool isSidebar;
+  const _Tile(this.w, this.color, this.onTap, {this.isSidebar = false});
 
   @override
   State<_Tile> createState() => _TileState();
@@ -426,37 +525,24 @@ class _TileState extends State<_Tile> {
     onExit: (_) => setState(() => _hovered = false),
     child: GestureDetector(
       onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: _hovered
-              ? widget.color.withOpacity(0.1)
-              : AppTheme.darkSurface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _hovered ? widget.color : AppTheme.darkBorder,
-          ),
-          boxShadow: _hovered
-              ? [BoxShadow(color: widget.color.withOpacity(0.2), blurRadius: 8)]
-              : [],
-        ),
+      child: Container(
+        decoration: widget.isSidebar
+            ? null // no box for sidebar
+            : BoxDecoration(
+                color: _hovered
+                    ? widget.color.withOpacity(0.1)
+                    : AppTheme.darkSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _hovered ? widget.color : AppTheme.darkBorder,
+                ),
+              ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: widget.color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: widget.color.withOpacity(0.3)),
-              ),
-              child: Center(
-                child: Text(
-                  widget.w['icon'] as String,
-                  style: const TextStyle(fontSize: 18),
-                ),
-              ),
+            Text(
+              widget.w['icon'] as String,
+              style: const TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 6),
             Text(

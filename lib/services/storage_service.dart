@@ -1,8 +1,9 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path/path.dart' as p;
+// Conditional import of dart:io (only used on non-web platforms)
+import 'dart:io' if (kIsWeb) 'dart:async' show File;
 
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;

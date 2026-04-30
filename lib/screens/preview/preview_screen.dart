@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/project_model.dart';
+import '../../models/screen_model.dart';
 import '../../services/firestore_service.dart';
 import '../builder/canvas_area.dart';
 import '../../widgets/floating_ai_button.dart';
@@ -16,8 +17,8 @@ class PreviewScreen extends StatefulWidget {
 
 class _PreviewScreenState extends State<PreviewScreen> {
   ProjectModel? _project;
-  int _activeScreen = 0;
   bool _loading = true;
+  bool _isHorizontal = true;
 
   @override
   void initState() {
@@ -31,6 +32,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
       _project = p;
       _loading = false;
     });
+  }
+
+  List<Widget> _intersperse(List<Widget> items, Widget separator) {
+    if (items.isEmpty) return [];
+    return [
+      for (int i = 0; i < items.length; i++) ...[
+        items[i],
+        if (i < items.length - 1) separator,
+      ],
+    ];
   }
 
   Color get _primaryColor {
@@ -55,7 +66,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
 
     final screens = _project?.screens ?? [];
-    final activeScreen = screens.isNotEmpty ? screens[_activeScreen] : null;
 
     return Scaffold(
       backgroundColor: const Color(0xFF060F1A),
@@ -85,194 +95,298 @@ class _PreviewScreenState extends State<PreviewScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Screen selector tabs
-          if (screens.length > 1)
-            Container(
-              color: AppTheme.darkCard,
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                itemCount: screens.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) {
-                  final active = i == _activeScreen;
-                  return GestureDetector(
-                    onTap: () => setState(() => _activeScreen = i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: active ? _primaryColor : AppTheme.darkSurface,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        screens[i].name,
+      body: screens.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.dashboard, size: 48, color: AppTheme.textMuted),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No screens to preview',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                // ── Orientation Toggle Bar ──────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: AppTheme.darkCard,
+                    border: Border(
+                      bottom: BorderSide(color: AppTheme.darkBorder),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Preview Orientation:',
                         style: TextStyle(
-                          color: active ? Colors.white : AppTheme.textMuted,
-                          fontSize: 12,
+                          color: AppTheme.textPrimary,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-          // Phone preview
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Phone frame
-                    Container(
-                      width: 320,
-                      height: 620,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(36),
-                        border: Border.all(
-                          color: AppTheme.darkBorder,
-                          width: 8,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _primaryColor.withOpacity(0.25),
-                            blurRadius: 48,
-                            offset: const Offset(0, 20),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _isHorizontal = true;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Column(
-                          children: [
-                            // Status bar
-                            Container(
-                              height: 36,
-                              color: _primaryColor,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    activeScreen?.name ?? _project?.name ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const Row(
-                                    children: [
-                                      Icon(
-                                        Icons.signal_cellular_4_bar,
-                                        color: Colors.white,
-                                        size: 14,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Icon(
-                                        Icons.battery_full,
-                                        color: Colors.white,
-                                        size: 14,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                          decoration: BoxDecoration(
+                            color: _isHorizontal
+                                ? AppTheme.primary.withOpacity(0.2)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: _isHorizontal
+                                  ? AppTheme.primary
+                                  : AppTheme.darkBorder,
                             ),
-
-                            // Widget content
-                            Expanded(
-                              child:
-                                  activeScreen == null ||
-                                      activeScreen.widgets.isEmpty
-                                  ? Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.phone_android,
-                                            size: 48,
-                                            color: Colors.grey.shade300,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Empty screen',
-                                            style: TextStyle(
-                                              color: Colors.grey.shade400,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : SingleChildScrollView(
-                                      padding: const EdgeInsets.all(10),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: activeScreen.widgets
-                                            .map(
-                                              (w) => Padding(
-                                                padding: const EdgeInsets.only(
-                                                  bottom: 8,
-                                                ),
-                                                child: WidgetRenderer(
-                                                  widgetModel: w,
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                    ),
-                            ),
-                          ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.arrow_forward,
+                                size: 14,
+                                color: _isHorizontal
+                                    ? AppTheme.primary
+                                    : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Horizontal',
+                                style: TextStyle(
+                                  color: _isHorizontal
+                                      ? AppTheme.primary
+                                      : AppTheme.textMuted,
+                                  fontSize: 12,
+                                  fontWeight: _isHorizontal
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // App info pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _isHorizontal = false;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: !_isHorizontal
+                                ? AppTheme.primary.withOpacity(0.2)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: !_isHorizontal
+                                  ? AppTheme.primary
+                                  : AppTheme.darkBorder,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.arrow_downward,
+                                size: 14,
+                                color: !_isHorizontal
+                                    ? AppTheme.primary
+                                    : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Vertical',
+                                style: TextStyle(
+                                  color: !_isHorizontal
+                                      ? AppTheme.primary
+                                      : AppTheme.textMuted,
+                                  fontSize: 12,
+                                  fontWeight: !_isHorizontal
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.darkCard,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.darkBorder),
-                      ),
-                      child: Text(
-                        '📱 ${_project?.name ?? ''} · ${screens.length} screen${screens.length != 1 ? 's' : ''}',
+                      const Spacer(),
+                      Text(
+                        '${screens.length} screen${screens.length != 1 ? 's' : ''}',
                         style: const TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 12,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+
+                // ── Scrollable Screens ──────────────────────────────────
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: _isHorizontal
+                        ? Axis.horizontal
+                        : Axis.vertical,
+                    padding: const EdgeInsets.all(24),
+                    child: _isHorizontal
+                        ? Row(
+                            children: _intersperse(
+                              screens
+                                  .map(
+                                    (screen) => _PreviewScreenFrame(
+                                      screen: screen,
+                                      primaryColor: _primaryColor,
+                                    ),
+                                  )
+                                  .toList(),
+                              const SizedBox(width: 24),
+                            ),
+                          )
+                        : Column(
+                            children: _intersperse(
+                              screens
+                                  .map(
+                                    (screen) => _PreviewScreenFrame(
+                                      screen: screen,
+                                      primaryColor: _primaryColor,
+                                    ),
+                                  )
+                                  .toList(),
+                              const SizedBox(height: 24),
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Preview Screen Frame (renders a single screen)
+// ══════════════════════════════════════════════════════════════════════════════
+class _PreviewScreenFrame extends StatelessWidget {
+  final AppScreen screen;
+  final Color primaryColor;
+
+  const _PreviewScreenFrame({required this.screen, required this.primaryColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 320,
+      height: 620,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(36),
+        border: Border.all(color: AppTheme.darkBorder, width: 8),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.25),
+            blurRadius: 48,
+            offset: const Offset(0, 20),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Column(
+          children: [
+            // Status bar
+            Container(
+              height: 36,
+              color: primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      screen.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.signal_cellular_4_bar,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.battery_full, color: Colors.white, size: 14),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Widget content
+            Expanded(
+              child: screen.widgets.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.phone_android,
+                            size: 48,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Empty screen',
+                            style: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: screen.widgets
+                            .map(
+                              (w) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: WidgetRenderer(widgetModel: w),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

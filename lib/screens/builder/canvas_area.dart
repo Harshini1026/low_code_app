@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/screen_model.dart';
 import '../../models/widget_model.dart';
+import '../../models/project_model.dart';
 import '../../providers/builder_provider.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -40,7 +41,7 @@ class _CanvasAreaState extends State<CanvasArea> {
       );
     }
 
-    return DragTarget<String>(
+    return DragTarget<Object>(
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (details) {
         final box = context.findRenderObject() as RenderBox?;
@@ -48,7 +49,14 @@ class _CanvasAreaState extends State<CanvasArea> {
         final local = box.globalToLocal(details.offset);
         final x = local.dx.clamp(0.0, box.size.width - 100).toDouble();
         final y = local.dy.clamp(0.0, box.size.height - 80).toDouble();
-        provider.addWidget(details.data, x, y);
+
+        // Handle both String type and Map full widget data
+        if (details.data is String) {
+          provider.addWidget(details.data as String, x, y);
+        } else if (details.data is Map) {
+          final widget = details.data as Map;
+          provider.addWidget(widget['type'] as String, x, y);
+        }
       },
       builder: (context, candidateData, _) {
         final isHovering = candidateData.isNotEmpty;
@@ -85,6 +93,7 @@ class _CanvasAreaState extends State<CanvasArea> {
                   (w) => _PositionedWidget(
                     key: ValueKey(w.id),
                     model: w,
+                    provider: provider,
                     isSelected: selected?.id == w.id,
                     onTap: () {
                       provider.selectWidget(w);
@@ -179,6 +188,7 @@ class _DotGridPainter extends CustomPainter {
 // ── Positioned & draggable widget ─────────────────────────────────────────────
 class _PositionedWidget extends StatefulWidget {
   final WidgetModel model;
+  final BuilderProvider? provider;
   final bool isSelected;
   final VoidCallback onTap;
   final Function(Offset) onMoved;
@@ -187,6 +197,7 @@ class _PositionedWidget extends StatefulWidget {
   const _PositionedWidget({
     super.key,
     required this.model,
+    this.provider,
     required this.isSelected,
     required this.onTap,
     required this.onMoved,
@@ -237,6 +248,8 @@ class _PositionedWidgetState extends State<_PositionedWidget> {
     return Positioned(
       left: _pos.dx,
       top: _pos.dy,
+      width: _width,
+      height: _height,
       child: GestureDetector(
         onTap: widget.onTap,
         onPanStart: (_) {
@@ -255,63 +268,70 @@ class _PositionedWidgetState extends State<_PositionedWidget> {
           _dragging = false;
           widget.onMoved(_pos);
         },
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // ── The rendered widget itself ────────────────────────────
-            _SelectionBorder(
-              isSelected: widget.isSelected,
-              child: WidgetRenderer(widgetModel: widget.model),
-            ),
+        child: Container(
+          width: _width,
+          height: _height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // ── The rendered widget itself ────────────────────────────
+              _SelectionBorder(
+                isSelected: widget.isSelected,
+                child: WidgetRenderer(
+                  widgetModel: widget.model,
+                  provider: widget.provider,
+                ),
+              ),
 
-            // ── FIX 10: Resize handle — bottom-right corner drag dot.
-            // Only visible when the widget is selected.
-            if (widget.isSelected)
-              Positioned(
-                right: -8,
-                bottom: -8,
-                child: GestureDetector(
-                  // Stop the pan from bubbling up to the move gesture.
-                  onPanStart: (d) {
-                    _resizing = true;
-                    _resizeStart = d.globalPosition;
-                    _resizeStartW = _width;
-                    _resizeStartH = _height;
-                  },
-                  onPanUpdate: (d) {
-                    final delta = d.globalPosition - _resizeStart;
-                    setState(() {
-                      _width = (_resizeStartW + delta.dx).clamp(80.0, 310.0);
-                      _height = (_resizeStartH + delta.dy).clamp(24.0, 580.0);
-                    });
-                  },
-                  onPanEnd: (_) {
-                    _resizing = false;
-                    widget.onResized(_width, _height);
-                  },
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withOpacity(0.4),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.open_in_full,
-                      size: 8,
-                      color: Colors.white,
+              // ── FIX 10: Resize handle — bottom-right corner drag dot.
+              // Only visible when the widget is selected.
+              if (widget.isSelected)
+                Positioned(
+                  right: -8,
+                  bottom: -8,
+                  child: GestureDetector(
+                    // Stop the pan from bubbling up to the move gesture.
+                    onPanStart: (d) {
+                      _resizing = true;
+                      _resizeStart = d.globalPosition;
+                      _resizeStartW = _width;
+                      _resizeStartH = _height;
+                    },
+                    onPanUpdate: (d) {
+                      final delta = d.globalPosition - _resizeStart;
+                      setState(() {
+                        _width = (_resizeStartW + delta.dx).clamp(80.0, 310.0);
+                        _height = (_resizeStartH + delta.dy).clamp(24.0, 580.0);
+                      });
+                    },
+                    onPanEnd: (_) {
+                      _resizing = false;
+                      widget.onResized(_width, _height);
+                    },
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primary.withOpacity(0.4),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.open_in_full,
+                        size: 8,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -341,15 +361,65 @@ class _SelectionBorder extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 // WidgetRenderer — reads from widgetModel.properties on every build so any
 // property change from the panel triggers an immediate visual update.
+// NOW: Uses theme colors and fonts from provider for consistent styling
 // ══════════════════════════════════════════════════════════════════════════════
 class WidgetRenderer extends StatelessWidget {
   final WidgetModel widgetModel;
-  const WidgetRenderer({super.key, required this.widgetModel});
+  final BuilderProvider? provider;
+  const WidgetRenderer({super.key, required this.widgetModel, this.provider});
 
   double get _safeWidth => (widgetModel.width <= 0) ? 300 : widgetModel.width;
   double get _safeHeight => (widgetModel.height <= 0)
       ? WidgetModel.defaultHeightFor(widgetModel.type)
       : widgetModel.height;
+
+  // ── Get theme from provider ────────────────────────────────────────────
+  ProjectTheme get _theme => provider?.project?.theme ?? const ProjectTheme();
+
+  // ── Get theme colors based on dark mode ────────────────────────────────
+  Color get _themeTextColor {
+    final hex = _theme.textColorHex;
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return _theme.isDarkMode ? Colors.white : Colors.black;
+    }
+  }
+
+  Color get _themeTextMuted {
+    final hex = _theme.textMutedHex;
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return _theme.isDarkMode ? Colors.grey[600]! : Colors.grey[400]!;
+    }
+  }
+
+  Color get _themeSurface {
+    final hex = _theme.surfaceColorHex;
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return _theme.isDarkMode ? Color(0xFF2A2A2A) : Colors.white;
+    }
+  }
+
+  Color get _themeSurfaceDark {
+    final hex = _theme.surfaceDarkHex;
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return _theme.isDarkMode ? Color(0xFF1F1F1F) : Color(0xFFF5F5F5);
+    }
+  }
+
+  Color get _themePrimary {
+    try {
+      return Color(int.parse(_theme.primaryColor.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppTheme.primary;
+    }
+  }
 
   Color _c(Map<String, dynamic> p, String k, Color fb) {
     try {
@@ -404,11 +474,11 @@ class WidgetRenderer extends StatelessWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: _c(props, 'color', AppTheme.primary),
+              backgroundColor: _c(props, 'color', _themePrimary),
               foregroundColor: _c(props, 'textColor', Colors.white),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(
-                  _d(props, 'borderRadius', 8),
+                  _d(props, 'borderRadius', _theme.borderRadius),
                 ),
               ),
               padding: EdgeInsets.zero,
@@ -417,7 +487,11 @@ class WidgetRenderer extends StatelessWidget {
             ),
             child: Text(
               _s(props, 'label', 'Button'),
-              style: TextStyle(fontSize: _d(props, 'fontSize', 14)),
+              style: TextStyle(
+                fontSize: _d(props, 'fontSize', 14),
+                fontFamily: _theme.fontFamily,
+                color: _c(props, 'textColor', Colors.white),
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -432,8 +506,9 @@ class WidgetRenderer extends StatelessWidget {
             child: Text(
               _s(props, 'content', 'Text'),
               style: TextStyle(
-                color: _c(props, 'color', Colors.black87),
+                color: _c(props, 'color', _themeTextColor),
                 fontSize: _d(props, 'fontSize', 16),
+                fontFamily: _theme.fontFamily,
                 fontWeight: props['bold'] == 'true' || props['bold'] == true
                     ? FontWeight.bold
                     : FontWeight.normal,
@@ -458,12 +533,20 @@ class WidgetRenderer extends StatelessWidget {
                 'placeholder',
                 _s(props, 'hint', 'Enter text…'),
               ),
+              hintStyle: TextStyle(
+                color: _c(props, 'hintColor', _themeTextMuted),
+                fontFamily: _theme.fontFamily,
+              ),
               labelText: _s(props, 'label', ''),
+              labelStyle: TextStyle(
+                color: _c(props, 'labelColor', _themeTextMuted),
+                fontFamily: _theme.fontFamily,
+              ),
               filled: true,
-              fillColor: _c(props, 'bgColor', Colors.grey[100]!),
+              fillColor: _c(props, 'bgColor', _themeSurfaceDark),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(
-                  _d(props, 'borderRadius', 8),
+                  _d(props, 'borderRadius', _theme.borderRadius),
                 ),
               ),
               isDense: true,
@@ -472,7 +555,10 @@ class WidgetRenderer extends StatelessWidget {
                 vertical: 10,
               ),
             ),
-            style: TextStyle(color: _c(props, 'textColor', Colors.black)),
+            style: TextStyle(
+              color: _c(props, 'textColor', _themeTextColor),
+              fontFamily: _theme.fontFamily,
+            ),
           ),
         );
 
@@ -493,7 +579,9 @@ class WidgetRenderer extends StatelessWidget {
           width: w,
           height: h,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(_d(props, 'borderRadius', 8)),
+            borderRadius: BorderRadius.circular(
+              _d(props, 'borderRadius', _theme.borderRadius),
+            ),
             child: src.startsWith('http')
                 ? Image.network(
                     src,
@@ -506,13 +594,13 @@ class WidgetRenderer extends StatelessWidget {
 
       // ── Card ───────────────────────────────────────────────────────────────
       case 'card':
-        final borderRadius = _d(props, 'borderRadius', 12);
+        final borderRadius = _d(props, 'borderRadius', _theme.borderRadius);
         return SizedBox(
           width: w,
           height: h,
           child: Card(
             elevation: _d(props, 'elevation', 2),
-            color: _c(props, 'bgColor', Colors.white),
+            color: _c(props, 'bgColor', _themeSurface),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
@@ -524,16 +612,22 @@ class WidgetRenderer extends StatelessWidget {
                   children: [
                     Text(
                       _s(props, 'title', 'Card Title'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
+                        fontFamily: _theme.fontFamily,
+                        color: _c(props, 'titleColor', _themeTextColor),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _s(props, 'subtitle', 'Subtitle'),
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: TextStyle(
+                        color: _c(props, 'subtitleColor', _themeTextMuted),
+                        fontSize: 12,
+                        fontFamily: _theme.fontFamily,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -568,17 +662,53 @@ class WidgetRenderer extends StatelessWidget {
           'arrow_back': Icons.arrow_back,
         };
 
-        final iconName = _s(props, 'iconName', 'star').toLowerCase();
+        final iconName = _s(props, 'name', 'star').toLowerCase();
         final selectedIcon = iconMap[iconName] ?? Icons.star;
+        final iconColor = _c(props, 'color', _themePrimary);
+        final iconSize = _d(props, 'size', 32.0);
+        final opacity = _d(props, 'opacity', 1.0).clamp(0.0, 1.0);
+        final hasBackground =
+            _s(props, 'hasBackground', 'false').toLowerCase() == 'true';
+        final backgroundColor = _c(props, 'backgroundColor', _themeSurface);
+        final backgroundRadius = _d(
+          props,
+          'backgroundRadius',
+          _theme.borderRadius,
+        );
+        final hasShadow =
+            _s(props, 'hasShadow', 'false').toLowerCase() == 'true';
+        final shadowBlur = _d(props, 'shadowBlur', 4.0);
 
         return SizedBox(
           width: w,
           height: h,
           child: Center(
-            child: Icon(
-              selectedIcon,
-              color: _c(props, 'color', AppTheme.primary),
-              size: _d(props, 'size', 32),
+            child: Container(
+              decoration: BoxDecoration(
+                color: hasBackground
+                    ? backgroundColor.withOpacity(opacity)
+                    : Colors.transparent,
+                borderRadius: hasBackground
+                    ? BorderRadius.circular(backgroundRadius)
+                    : BorderRadius.zero,
+                boxShadow: hasShadow
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15 * opacity),
+                          blurRadius: shadowBlur,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : [],
+              ),
+              padding: hasBackground
+                  ? EdgeInsets.all(iconSize * 0.25)
+                  : EdgeInsets.zero,
+              child: Icon(
+                selectedIcon,
+                color: iconColor.withOpacity(opacity),
+                size: iconSize,
+              ),
             ),
           ),
         );
@@ -592,13 +722,13 @@ class WidgetRenderer extends StatelessWidget {
           child: direction == 'vertical'
               ? Center(
                   child: VerticalDivider(
-                    color: _c(props, 'color', Colors.grey),
+                    color: _c(props, 'color', _themeTextMuted),
                     thickness: _d(props, 'thickness', 1),
                   ),
                 )
               : Center(
                   child: Divider(
-                    color: _c(props, 'color', Colors.grey),
+                    color: _c(props, 'color', _themeTextMuted),
                     thickness: _d(props, 'thickness', 1),
                   ),
                 ),
@@ -610,7 +740,7 @@ class WidgetRenderer extends StatelessWidget {
           width: w,
           height: h,
           child: Container(
-            color: _c(props, 'color', AppTheme.primary),
+            color: _c(props, 'color', _themePrimary),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: [
@@ -622,10 +752,11 @@ class WidgetRenderer extends StatelessWidget {
                 Expanded(
                   child: Text(
                     _s(props, 'title', 'Screen Title'),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: _c(props, 'textColor', Colors.white),
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
+                      fontFamily: _theme.fontFamily,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -643,36 +774,25 @@ class WidgetRenderer extends StatelessWidget {
           ),
         );
 
-      // ── Nav Bar ────────────────────────────────────────────────────────────
+      // ── Bottom Nav (formerly Nav Bar) ──────────────────────────────────────
       case 'navbar':
-        return SizedBox(
+        return _BottomNavWidget(
+          props: props,
           width: w,
           height: h,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [Icons.home, Icons.search, Icons.person]
-                  .map(
-                    (ic) => Icon(
-                      ic,
-                      color: _c(props, 'color', AppTheme.primary),
-                      size: 22,
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
+          provider: provider,
         );
 
       // ── Checkbox ───────────────────────────────────────────────────────────
       // FIX 11: Checkbox is now a StatefulWidget wrapper so tapping it actually
       // toggles the visual state in the canvas preview.
       case 'checkbox':
-        return _CheckboxWidget(props: props, width: w, height: h);
+        return _CheckboxWidget(
+          props: props,
+          width: w,
+          height: h,
+          provider: provider,
+        );
 
       // ── Switch ─────────────────────────────────────────────────────────────
       // FIX 12: Switch gets the same stateful treatment as Checkbox.
@@ -703,12 +823,16 @@ class WidgetRenderer extends StatelessWidget {
                           Checkbox(
                             value: _list(props, 'selected', []).contains(item),
                             onChanged: (_) {},
-                            activeColor: _c(props, 'color', AppTheme.primary),
+                            activeColor: _c(props, 'color', _themePrimary),
                           ),
                           Expanded(
                             child: Text(
                               item,
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontFamily: _theme.fontFamily,
+                                color: _c(props, 'textColor', _themeTextColor),
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -731,13 +855,13 @@ class WidgetRenderer extends StatelessWidget {
           height: h,
           child: Container(
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(color: _themeTextMuted.withOpacity(0.3)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: ListView.separated(
               itemCount: items.length,
               separatorBuilder: (_, __) => showDivider
-                  ? const Divider(height: 1)
+                  ? Divider(height: 1, color: _themeTextMuted.withOpacity(0.2))
                   : const SizedBox.shrink(),
               itemBuilder: (_, i) => Padding(
                 padding: const EdgeInsets.symmetric(
@@ -746,7 +870,11 @@ class WidgetRenderer extends StatelessWidget {
                 ),
                 child: Text(
                   items[i],
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: _theme.fontFamily,
+                    color: _c(props, 'textColor', _themeTextColor),
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -756,42 +884,76 @@ class WidgetRenderer extends StatelessWidget {
 
       // ── Grid ───────────────────────────────────────────────────────────────
       case 'grid':
-        final cols = _d(props, 'columns', 2).toInt();
+        // ── Extract grid properties ────────────────────────────────────────
+        final crossAxisCount = _d(
+          props,
+          'crossAxisCount',
+          _d(props, 'columns', 2),
+        ).toInt();
+        final mainAxisSpacing = _d(props, 'mainAxisSpacing', 8);
+        final crossAxisSpacing = _d(props, 'crossAxisSpacing', 8);
+        final childAspectRatio = _d(props, 'childAspectRatio', 1.2);
+        final itemCountProp = _d(props, 'itemCount', 6).toInt();
+        final scrollEnabled =
+            props['scrollEnabled'] != 'false' &&
+            props['scrollEnabled'] != false;
+
+        // ── Get items and grid data ────────────────────────────────────────
         final items = _list(
           props,
           'items',
-          List.generate(6, (i) => 'Item ${i + 1}'),
+          List.generate(itemCountProp, (i) => 'Item ${i + 1}'),
         );
+
+        // Use itemCountProp to limit items or extend defaults
+        final displayItems = items.length >= itemCountProp
+            ? items.take(itemCountProp).toList()
+            : [
+                ...items,
+                ...List.generate(
+                  itemCountProp - items.length,
+                  (i) => 'Item ${items.length + i + 1}',
+                ),
+              ];
+
         final imageUrls = _list(props, 'imageUrls', []);
         final videoUrls = _list(props, 'videoUrls', []);
+
         return SizedBox(
           width: w,
           height: h,
           child: GridView.builder(
+            physics: scrollEnabled
+                ? const AlwaysScrollableScrollPhysics()
+                : const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.all(8),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: cols,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.2,
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: crossAxisSpacing,
+              mainAxisSpacing: mainAxisSpacing,
+              childAspectRatio: childAspectRatio,
             ),
-            itemCount: items.length,
+            itemCount: displayItems.length,
             itemBuilder: (_, i) {
+              final text = displayItems[i];
               final hasImageUrl =
                   imageUrls.isNotEmpty &&
                   i < imageUrls.length &&
-                  imageUrls[i].isNotEmpty;
+                  imageUrls[i].isNotEmpty &&
+                  imageUrls[i].startsWith('http');
               final hasVideoUrl =
                   videoUrls.isNotEmpty &&
                   i < videoUrls.length &&
                   videoUrls[i].isNotEmpty;
+
+              // ── Build grid item with optional image and text ──────────────
               return Container(
                 decoration: BoxDecoration(
-                  color: _c(props, 'itemColor', Colors.grey[200]!),
+                  color: _c(props, 'itemColor', _themeSurfaceDark),
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: _themeTextColor.withOpacity(0.1),
                       blurRadius: 4,
                     ),
                   ],
@@ -799,15 +961,14 @@ class WidgetRenderer extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Image, Video, or placeholder
+                      // ── Image, Video, or placeholder section ──────────────
                       if (hasVideoUrl)
                         Expanded(
                           flex: 2,
                           child: Container(
                             width: double.infinity,
-                            color: Colors.black,
+                            color: _themeTextColor.withOpacity(0.1),
                             child: _GridItemVideoWidget(videoUrl: videoUrls[i]),
                           ),
                         )
@@ -816,7 +977,7 @@ class WidgetRenderer extends StatelessWidget {
                           flex: 2,
                           child: Container(
                             width: double.infinity,
-                            decoration: BoxDecoration(color: Colors.grey[300]),
+                            decoration: BoxDecoration(color: _themeSurfaceDark),
                             child: Image.network(
                               imageUrls[i],
                               fit: BoxFit.cover,
@@ -824,7 +985,7 @@ class WidgetRenderer extends StatelessWidget {
                                 child: Icon(
                                   Icons.broken_image,
                                   size: 24,
-                                  color: Colors.grey[600],
+                                  color: _themeTextMuted,
                                 ),
                               ),
                             ),
@@ -835,31 +996,39 @@ class WidgetRenderer extends StatelessWidget {
                           flex: 2,
                           child: Container(
                             width: double.infinity,
-                            decoration: BoxDecoration(color: Colors.grey[300]),
+                            decoration: BoxDecoration(color: _themeSurfaceDark),
                             child: Icon(
                               Icons.image,
                               size: 24,
-                              color: Colors.grey[600],
+                              color: _themeTextMuted,
                             ),
                           ),
                         )
                       else
                         const SizedBox(height: 4),
-                      // Text content
+
+                      // ── Text content with background ──────────────────────
                       Expanded(
                         flex: 1,
                         child: Container(
+                          width: double.infinity,
+                          color: _c(
+                            props,
+                            'textBackgroundColor',
+                            _themeSurface,
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 4,
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            items[i],
+                            text,
                             style: TextStyle(
                               fontSize: 11,
+                              fontFamily: _theme.fontFamily,
                               fontWeight: FontWeight.w500,
-                              color: _c(props, 'textColor', Colors.black),
+                              color: _c(props, 'textColor', _themeTextColor),
                             ),
                             textAlign: TextAlign.center,
                             maxLines: 2,
@@ -880,15 +1049,16 @@ class WidgetRenderer extends StatelessWidget {
         final fields = _list(props, 'fields', ['Name', 'Email', 'Phone']);
         final fieldColor = _c(props, 'fieldBgColor', Colors.white);
         final fieldBorderColor = _c(props, 'fieldBorderColor', Colors.grey);
+        final labelColor = _c(props, 'labelColor', Colors.black87);
+        final textColor = _c(props, 'textColor', Colors.black);
         return SizedBox(
           width: w,
           height: h,
           child: Container(
             color: _c(props, 'bgColor', Colors.transparent),
-            padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: h - 32),
+            padding: const EdgeInsets.all(10),
+            child: Flexible(
+              child: Form(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -897,61 +1067,59 @@ class WidgetRenderer extends StatelessWidget {
                     if (_s(props, 'title', '').isNotEmpty) ...[
                       Text(
                         _s(props, 'title', ''),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: _c(props, 'titleColor', Colors.black),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 6),
                     ],
                     // Dynamic form fields
                     ...fields.map(
                       (field) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(bottom: 4),
                         child: TextField(
                           decoration: InputDecoration(
                             labelText: field,
                             filled: true,
                             fillColor: fieldColor,
-                            labelStyle: const TextStyle(color: Colors.black87),
+                            labelStyle: TextStyle(color: labelColor),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide(color: fieldBorderColor),
                             ),
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                              horizontal: 10,
+                              vertical: 8,
                             ),
                           ),
-                          style: const TextStyle(color: Colors.black),
+                          style: TextStyle(color: textColor),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     // Submit button
-                    SizedBox(
-                      height: 44,
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _c(
-                            props,
-                            'submitColor',
-                            AppTheme.primary,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                    ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _c(
+                          props,
+                          'submitColor',
+                          AppTheme.primary,
                         ),
-                        child: Text(
-                          _s(props, 'submitLabel', 'Submit'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                      child: Text(
+                        _s(props, 'submitLabel', 'Submit'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -965,76 +1133,77 @@ class WidgetRenderer extends StatelessWidget {
       // ── Container ──────────────────────────────────────────────────────────
       case 'container':
         final imageUrl = _s(props, 'imageUrl', '');
-        final hasImage = imageUrl.isNotEmpty;
+        final hasImage = imageUrl.isNotEmpty && imageUrl.startsWith('http');
+        final padding = _d(props, 'padding', 0).toDouble();
+        final margin = _d(props, 'marginAll', 0).toDouble();
+        final borderRadius = _d(props, 'borderRadius', 8);
+
+        // ── Determine background decoration ──────────────────────────────────
+        // If imageUrl is provided and valid, use DecorationImage
+        // Otherwise use bgColor for background
+        Decoration decoration;
+        if (hasImage) {
+          decoration = BoxDecoration(
+            image: DecorationImage(
+              image: NetworkImage(imageUrl),
+              fit: BoxFit.cover,
+              onError: (exception, stackTrace) {},
+            ),
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(
+              color: _c(props, 'borderColor', Colors.transparent),
+              width: _d(props, 'borderWidth', 1),
+            ),
+          );
+        } else {
+          decoration = BoxDecoration(
+            color: _c(props, 'bgColor', Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(
+              color: _c(props, 'borderColor', Colors.transparent),
+              width: _d(props, 'borderWidth', 1),
+            ),
+          );
+        }
+
         return SizedBox(
           width: w,
           height: h,
-          child: Container(
-            decoration: BoxDecoration(
-              color: _c(props, 'bgColor', Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(_d(props, 'borderRadius', 8)),
-              border: Border.all(
-                color: _c(props, 'borderColor', Colors.transparent),
-                width: _d(props, 'borderWidth', 1),
-              ),
-            ),
-            child: hasImage
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(
-                      _d(props, 'borderRadius', 8),
-                    ),
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.image_not_supported,
-                              size: 32,
-                              color: Colors.grey,
+          child: Padding(
+            padding: EdgeInsets.all(margin),
+            child: Container(
+              decoration: decoration,
+              padding: EdgeInsets.all(padding),
+              child: hasImage
+                  ? null // Image shows from decoration
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.image, size: 40, color: Colors.grey[600]),
+                          const SizedBox(height: 8),
+                          Text(
+                            _s(props, 'label', 'Container'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _c(props, 'textColor', Colors.black),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Invalid Image URL',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Add imageUrl property to display image',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.grey[500],
                             ),
-                          ],
-                        ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                  )
-                : Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.image, size: 40, color: Colors.grey[600]),
-                        const SizedBox(height: 8),
-                        Text(
-                          _s(props, 'label', 'Container'),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black,
-                          ),
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Add imageUrl property to display image',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
+            ),
           ),
         );
 
@@ -1086,12 +1255,14 @@ class WidgetRenderer extends StatelessWidget {
             maxLines: maxLines,
             decoration: InputDecoration(
               hintText: _s(props, 'hint', 'Enter text...'),
+              hintStyle: TextStyle(color: Colors.grey[600]),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
               isDense: true,
               contentPadding: const EdgeInsets.all(10),
             ),
+            style: TextStyle(color: _c(props, 'textColor', Colors.black)),
           ),
         );
 
@@ -1103,6 +1274,7 @@ class WidgetRenderer extends StatelessWidget {
           child: TextField(
             decoration: InputDecoration(
               hintText: _s(props, 'placeholder', 'Search...'),
+              hintStyle: TextStyle(color: Colors.grey[600]),
               prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -1110,7 +1282,7 @@ class WidgetRenderer extends StatelessWidget {
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
-            style: TextStyle(color: _c(props, 'color', Colors.black)),
+            style: TextStyle(color: _c(props, 'textColor', Colors.black)),
           ),
         );
 
@@ -1202,7 +1374,11 @@ class WidgetRenderer extends StatelessWidget {
           height: h,
           child: Center(
             child: Chip(
-              label: Text(_s(props, 'label', 'Chip')),
+              label: Text(
+                _s(props, 'label', 'Chip'),
+                style: TextStyle(color: _c(props, 'textColor', Colors.black)),
+              ),
+              backgroundColor: _c(props, 'bgColor', Colors.grey[200]!),
               deleteIcon: const Icon(Icons.close),
               onDeleted: () {},
             ),
@@ -1211,96 +1387,336 @@ class WidgetRenderer extends StatelessWidget {
 
       // ── Row ────────────────────────────────────────────────────────────────
       case 'row':
-        final items = _list(props, 'items', ['Item 1', 'Item 2', 'Item 3']);
-        final alignStr = _s(props, 'alignment', 'start');
-        final alignment =
-            const {
-              'start': MainAxisAlignment.start,
-              'center': MainAxisAlignment.center,
-              'end': MainAxisAlignment.end,
-              'spaceAround': MainAxisAlignment.spaceAround,
-              'spaceBetween': MainAxisAlignment.spaceBetween,
-            }[alignStr] ??
-            MainAxisAlignment.start;
-        final spacing = _d(props, 'spacing', 4);
-        return SizedBox(
-          width: w,
-          height: h,
-          child: Row(
-            mainAxisAlignment: alignment,
-            children: items
-                .asMap()
-                .entries
-                .expand(
-                  (e) => [
-                    Expanded(
-                      child: Container(
-                        margin: EdgeInsets.all(spacing),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          e.value,
-                          style: const TextStyle(fontSize: 12),
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
+        // NEW: Use actual child widgets if they exist, fallback to items list
+        if (widgetModel.children.isNotEmpty) {
+          final mainAxisAlignStr = _s(props, 'mainAxisAlignment', 'start');
+          final mainAxisAlign =
+              const {
+                'start': MainAxisAlignment.start,
+                'center': MainAxisAlignment.center,
+                'end': MainAxisAlignment.end,
+                'spaceBetween': MainAxisAlignment.spaceBetween,
+                'spaceAround': MainAxisAlignment.spaceAround,
+                'spaceEvenly': MainAxisAlignment.spaceEvenly,
+              }[mainAxisAlignStr] ??
+              MainAxisAlignment.start;
+
+          final crossAxisAlignStr = _s(props, 'crossAxisAlignment', 'start');
+          final crossAxisAlign =
+              const {
+                'start': CrossAxisAlignment.start,
+                'center': CrossAxisAlignment.center,
+                'end': CrossAxisAlignment.end,
+                'stretch': CrossAxisAlignment.stretch,
+              }[crossAxisAlignStr] ??
+              CrossAxisAlignment.start;
+
+          final mainAxisSizeStr = _s(props, 'mainAxisSize', 'max');
+          final mainAxisSize = mainAxisSizeStr == 'min'
+              ? MainAxisSize.min
+              : MainAxisSize.max;
+
+          final spacing = _d(props, 'spacing', 4).toInt();
+          final scrollEnabled = _s(props, 'scrollEnabled', 'false') == 'true';
+
+          final childWidgets = widgetModel.children
+              .asMap()
+              .entries
+              .expand<Widget>((e) {
+                final childIndex = e.key;
+                final child = e.value;
+                final childWidget = WidgetRenderer(widgetModel: child);
+
+                return [
+                  if (childIndex > 0) SizedBox(width: spacing.toDouble()),
+                  SizedBox(
+                    width: child.width,
+                    height: child.height,
+                    child: childWidget,
+                  ),
+                ];
+              })
+              .toList();
+
+          final rowWidget = Row(
+            mainAxisAlignment: mainAxisAlign,
+            crossAxisAlignment: crossAxisAlign,
+            mainAxisSize: mainAxisSize,
+            children: childWidgets,
+          );
+
+          if (scrollEnabled) {
+            return SizedBox(
+              width: w,
+              height: h,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: rowWidget,
+              ),
+            );
+          } else {
+            return SizedBox(width: w, height: h, child: rowWidget);
+          }
+        } else {
+          // Fallback: old items-based rendering
+          final items = _list(props, 'items', ['Item 1', 'Item 2', 'Item 3']);
+          final alignStr = _s(props, 'mainAxisAlignment', 'start');
+          final alignment =
+              const {
+                'start': MainAxisAlignment.start,
+                'center': MainAxisAlignment.center,
+                'end': MainAxisAlignment.end,
+                'spaceAround': MainAxisAlignment.spaceAround,
+                'spaceBetween': MainAxisAlignment.spaceBetween,
+                'spaceEvenly': MainAxisAlignment.spaceEvenly,
+              }[alignStr] ??
+              MainAxisAlignment.start;
+          final spacing = _d(props, 'spacing', 4);
+          return SizedBox(
+            width: w,
+            height: h,
+            child: Row(
+              mainAxisAlignment: alignment,
+              children: items
+                  .asMap()
+                  .entries
+                  .expand(
+                    (e) => [
+                      Expanded(
+                        child: Container(
+                          margin: EdgeInsets.all(spacing),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            e.value,
+                            style: const TextStyle(fontSize: 12),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
-                    ),
-                    if (e.key < items.length - 1) SizedBox(width: spacing),
-                  ],
-                )
-                .toList(),
-          ),
-        );
+                      if (e.key < items.length - 1) SizedBox(width: spacing),
+                    ],
+                  )
+                  .toList(),
+            ),
+          );
+        }
 
       // ── Column ─────────────────────────────────────────────────────────────
       case 'column':
-        final items = _list(props, 'items', ['Item 1', 'Item 2', 'Item 3']);
-        final alignStr = _s(props, 'alignment', 'start');
-        final alignment =
-            const {
-              'start': MainAxisAlignment.start,
-              'center': MainAxisAlignment.center,
-              'end': MainAxisAlignment.end,
-              'spaceAround': MainAxisAlignment.spaceAround,
-              'spaceBetween': MainAxisAlignment.spaceBetween,
-            }[alignStr] ??
-            MainAxisAlignment.start;
-        final spacing = _d(props, 'spacing', 4);
-        return SizedBox(
-          width: w,
-          height: h,
-          child: Column(
-            mainAxisAlignment: alignment,
-            children: items
-                .asMap()
-                .entries
-                .expand(
-                  (e) => [
-                    Expanded(
-                      child: Container(
-                        margin: EdgeInsets.all(spacing),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          e.value,
-                          style: const TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
+        // NEW: Use actual child widgets if they exist, fallback to items list
+        if (widgetModel.children.isNotEmpty) {
+          final mainAxisAlignStr = _s(props, 'mainAxisAlignment', 'start');
+          final mainAxisAlign =
+              const {
+                'start': MainAxisAlignment.start,
+                'center': MainAxisAlignment.center,
+                'end': MainAxisAlignment.end,
+                'spaceBetween': MainAxisAlignment.spaceBetween,
+                'spaceAround': MainAxisAlignment.spaceAround,
+                'spaceEvenly': MainAxisAlignment.spaceEvenly,
+              }[mainAxisAlignStr] ??
+              MainAxisAlignment.start;
+
+          final crossAxisAlignStr = _s(props, 'crossAxisAlignment', 'start');
+          final crossAxisAlign =
+              const {
+                'start': CrossAxisAlignment.start,
+                'center': CrossAxisAlignment.center,
+                'end': CrossAxisAlignment.end,
+                'stretch': CrossAxisAlignment.stretch,
+              }[crossAxisAlignStr] ??
+              CrossAxisAlignment.start;
+
+          final mainAxisSizeStr = _s(props, 'mainAxisSize', 'max');
+          final mainAxisSize = mainAxisSizeStr == 'min'
+              ? MainAxisSize.min
+              : MainAxisSize.max;
+
+          final spacing = _d(props, 'spacing', 4).toInt();
+          final scrollEnabled = _s(props, 'scrollEnabled', 'false') == 'true';
+
+          final childWidgets = widgetModel.children
+              .asMap()
+              .entries
+              .expand<Widget>((e) {
+                final childIndex = e.key;
+                final child = e.value;
+                final childWidget = WidgetRenderer(widgetModel: child);
+
+                return [
+                  if (childIndex > 0) SizedBox(height: spacing.toDouble()),
+                  SizedBox(
+                    width: child.width,
+                    height: child.height,
+                    child: childWidget,
+                  ),
+                ];
+              })
+              .toList();
+
+          final columnWidget = Column(
+            mainAxisAlignment: mainAxisAlign,
+            crossAxisAlignment: crossAxisAlign,
+            mainAxisSize: mainAxisSize,
+            children: childWidgets,
+          );
+
+          if (scrollEnabled) {
+            return SizedBox(
+              width: w,
+              height: h,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: columnWidget,
+              ),
+            );
+          } else {
+            return SizedBox(width: w, height: h, child: columnWidget);
+          }
+        } else {
+          // Fallback: old items-based rendering
+          final items = _list(props, 'items', ['Item 1', 'Item 2', 'Item 3']);
+          final alignStr = _s(props, 'mainAxisAlignment', 'start');
+          final alignment =
+              const {
+                'start': MainAxisAlignment.start,
+                'center': MainAxisAlignment.center,
+                'end': MainAxisAlignment.end,
+                'spaceAround': MainAxisAlignment.spaceAround,
+                'spaceBetween': MainAxisAlignment.spaceBetween,
+                'spaceEvenly': MainAxisAlignment.spaceEvenly,
+              }[alignStr] ??
+              MainAxisAlignment.start;
+          final spacing = _d(props, 'spacing', 4);
+          return SizedBox(
+            width: w,
+            height: h,
+            child: Column(
+              mainAxisAlignment: alignment,
+              children: items
+                  .asMap()
+                  .entries
+                  .expand(
+                    (e) => [
+                      Expanded(
+                        child: Container(
+                          margin: EdgeInsets.all(spacing),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            e.value,
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
+                      if (e.key < items.length - 1) SizedBox(height: spacing),
+                    ],
+                  )
+                  .toList(),
+            ),
+          );
+        }
+
+      // ── SingleChildScrollView ───────────────────────────────────────────────
+      case 'singlechildscrollview':
+        final scrollDirection = _s(props, 'scrollDirection', 'vertical');
+        final scrollEnabled = _s(props, 'scrollEnabled', 'true') == 'true';
+        final padding = _d(props, 'padding', 0);
+
+        // ── Scroll direction ───────────────────────────────────────────────
+        final axis = scrollDirection == 'horizontal'
+            ? Axis.horizontal
+            : Axis.vertical;
+
+        // ── Physics: 'always' = AlwaysScrollableScrollPhysics, otherwise NeverScrollableScrollPhysics
+        final physics = !scrollEnabled
+            ? const NeverScrollableScrollPhysics()
+            : const AlwaysScrollableScrollPhysics();
+
+        // ── Render child if exists (only one child allowed) ──────────────────
+        if (widgetModel.children.isNotEmpty) {
+          final child = widgetModel.children.first;
+          final childWidget = WidgetRenderer(widgetModel: child);
+
+          return SizedBox(
+            width: w,
+            height: h,
+            child: SingleChildScrollView(
+              scrollDirection: axis,
+              physics: physics,
+              padding: EdgeInsets.all(padding),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: axis == Axis.horizontal ? w - (padding * 2) : 0,
+                  minHeight: axis == Axis.vertical ? h - (padding * 2) : 0,
+                ),
+                child: SizedBox(
+                  width: axis == Axis.horizontal ? null : child.width,
+                  height: axis == Axis.vertical ? null : child.height,
+                  child: childWidget,
+                ),
+              ),
+            ),
+          );
+        } else {
+          // ── Placeholder when no child is added ──────────────────────────
+          return SizedBox(
+            width: w,
+            height: h,
+            child: Container(
+              decoration: BoxDecoration(
+                color: _c(props, 'bgColor', _themeSurfaceDark),
+                border: Border.all(
+                  color: _themeTextMuted.withOpacity(0.3),
+                  width: 2,
+                  style: BorderStyle.solid,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      axis == Axis.horizontal ? Icons.west : Icons.north,
+                      size: 32,
+                      color: _themeTextMuted,
                     ),
-                    if (e.key < items.length - 1) SizedBox(height: spacing),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ScrollView - Add a child widget',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _themeTextMuted,
+                        fontFamily: _theme.fontFamily,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Direction: ${scrollDirection == 'horizontal' ? '↔ Horizontal' : '↕ Vertical'}',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: _themeTextMuted.withOpacity(0.7),
+                        fontFamily: _theme.fontFamily,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ],
-                )
-                .toList(),
-          ),
-        );
+                ),
+              ),
+            ),
+          );
+        }
 
       // ── Padding ────────────────────────────────────────────────────────────
       case 'padding':
@@ -1426,41 +1842,7 @@ class WidgetRenderer extends StatelessWidget {
 
       // ── Tabs ───────────────────────────────────────────────────────────────
       case 'tabs':
-        final tabCount = _d(props, 'tabs', 3).toInt().clamp(1, 10);
-        final activeTab = _d(props, 'activeTab', 0).toInt();
-        final tabLabels = _list(
-          props,
-          'tabLabels',
-          List.generate(tabCount, (i) => 'Tab ${i + 1}'),
-        );
-        return DefaultTabController(
-          length: tabCount,
-          initialIndex: activeTab.clamp(0, tabCount - 1),
-          child: SizedBox(
-            width: w,
-            height: h,
-            child: Column(
-              children: [
-                TabBar(
-                  tabs: List.generate(tabCount, (i) => Tab(text: tabLabels[i])),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: List.generate(
-                      tabCount,
-                      (i) => Center(
-                        child: Text(
-                          'Content ${i + 1}',
-                          style: TextStyle(fontSize: _d(props, 'fontSize', 14)),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+        return _TabsWidget(props: props, width: w, height: h);
 
       // ── Stepper ────────────────────────────────────────────────────────────
       case 'stepper':
@@ -2464,8 +2846,380 @@ class WidgetRenderer extends StatelessWidget {
           ),
         );
 
-      // ── Default fallback ───────────────────────────────────────────────────
+      // ── SwitchListTile ─────────────────────────────────────────────────────
+      case 'switch_listtile':
+        return _SwitchListTileWidget(props: props, width: w, height: h);
+
+      // ── CheckboxListTile ───────────────────────────────────────────────────
+      case 'checkbox_listtile':
+        return _CheckboxListTileWidget(props: props, width: w, height: h);
+
+      // ── GestureDetector ────────────────────────────────────────────────────
+      case 'gesture_detector':
+        final label = _s(props, 'label', 'Tap me');
+        final bgColor = _c(props, 'bgColor', AppTheme.primary);
+        final textColor = _c(props, 'textColor', Colors.white);
+        final borderRadius = _d(props, 'borderRadius', 8);
+        final navigationType = _s(props, 'navigationType', 'none');
+        final targetScreenOption = _s(props, 'targetScreen', '');
+
+        // Extract screen ID from "name:id" format
+        final screenId = targetScreenOption.contains(':')
+            ? targetScreenOption.split(':').last.trim()
+            : '';
+
+        return SizedBox(
+          width: w,
+          height: h,
+          child: GestureDetector(
+            onTap: () {
+              if (navigationType == 'switchScreen' &&
+                  screenId.isNotEmpty &&
+                  provider != null) {
+                // Switch to target screen inside Builder (NOT using Navigator.push)
+                provider!.setCurrentScreen(screenId);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(borderRadius),
+                border: Border.all(
+                  color: _c(props, 'borderColor', Colors.grey),
+                  width: _d(props, 'borderWidth', 1),
+                ),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: _d(props, 'fontSize', 14),
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        );
+
+      // ── Circle Avatar ──────────────────────────────────────────────────────
+      case 'circleavatar':
+        final imageUrl = _s(props, 'imageUrl', '');
+        final radius = _d(props, 'radius', 40);
+        final bgColor = _c(props, 'backgroundColor', AppTheme.primary);
+        final textValue = _s(props, 'text', 'AB');
+        final textColorValue = _c(props, 'textColor', Colors.white);
+        final borderColor = _c(props, 'borderColor', Colors.white);
+        final borderWidth = _d(props, 'borderWidth', 0);
+        final hasImage = imageUrl.isNotEmpty && imageUrl.startsWith('http');
+
+        return SizedBox(
+          width: w,
+          height: h,
+          child: Center(
+            child: Container(
+              decoration: borderWidth > 0
+                  ? BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: borderColor,
+                        width: borderWidth,
+                      ),
+                    )
+                  : null,
+              child: CircleAvatar(
+                radius: radius,
+                backgroundColor: hasImage ? Colors.transparent : bgColor,
+                backgroundImage: hasImage ? NetworkImage(imageUrl) : null,
+                onBackgroundImageError: hasImage
+                    ? (e, st) {
+                        // Fallback to initials on image error
+                      }
+                    : null,
+                child: !hasImage
+                    ? Text(
+                        textValue,
+                        style: TextStyle(
+                          color: textColorValue,
+                          fontSize: _d(props, 'fontSize', 18),
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        );
+
+      // ── List Tile ──────────────────────────────────────────────────────────
+      case 'listtile':
+        final title = _s(props, 'title', 'List Item');
+        final subtitle = _s(props, 'subtitle', 'Subtitle');
+        final leadingType = _s(props, 'leadingType', 'none');
+        final leadingImageUrl = _s(props, 'leadingImageUrl', '');
+        final leadingIcon = _s(props, 'leadingIcon', 'home');
+        final trailingType = _s(props, 'trailingType', 'none');
+        final trailingIcon = _s(props, 'trailingIcon', 'arrow_forward');
+        final bgColor = _c(props, 'backgroundColor', Colors.white);
+        final textColor = _c(props, 'textColor', Colors.black87);
+        final subtitleColor = _c(props, 'subtitleColor', Colors.grey);
+        final padding = _d(props, 'padding', 12);
+
+        final iconMap = {
+          'home': Icons.home,
+          'search': Icons.search,
+          'settings': Icons.settings,
+          'user': Icons.person,
+          'arrow_forward': Icons.arrow_forward,
+          'more_vert': Icons.more_vert,
+          'delete': Icons.delete,
+          'edit': Icons.edit,
+          'star': Icons.star,
+          'favorite': Icons.favorite,
+          'share': Icons.share,
+          'info': Icons.info,
+        };
+
+        Widget? leading;
+        switch (leadingType) {
+          case 'image':
+            if (leadingImageUrl.isNotEmpty) {
+              leading = CircleAvatar(
+                backgroundImage: NetworkImage(leadingImageUrl),
+                radius: 20,
+              );
+            }
+            break;
+          case 'icon':
+            leading = Icon(
+              iconMap[leadingIcon] ?? Icons.home,
+              color: AppTheme.primary,
+            );
+            break;
+          case 'avatar':
+            leading = CircleAvatar(
+              backgroundColor: AppTheme.primary,
+              child: Text('A', style: const TextStyle(color: Colors.white)),
+            );
+            break;
+        }
+
+        Widget? trailing;
+        switch (trailingType) {
+          case 'icon':
+            trailing = Icon(
+              iconMap[trailingIcon] ?? Icons.arrow_forward,
+              color: AppTheme.primary,
+            );
+            break;
+          case 'switch':
+            trailing = Switch(value: false, onChanged: (_) {});
+            break;
+          case 'checkbox':
+            trailing = Checkbox(value: false, onChanged: (_) {});
+            break;
+        }
+
+        return SizedBox(
+          width: w,
+          height: h,
+          child: Container(
+            decoration: BoxDecoration(
+              color: bgColor,
+              border: Border.all(color: Colors.grey[300]!, width: 0.5),
+            ),
+            child: ListTile(
+              leading: leading,
+              title: Text(
+                title,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: subtitle.isNotEmpty
+                  ? Text(
+                      subtitle,
+                      style: TextStyle(color: subtitleColor, fontSize: 13),
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : null,
+              trailing: trailing,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Tapped: $title'),
+                    duration: const Duration(milliseconds: 800),
+                  ),
+                );
+              },
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: padding,
+                vertical: 8,
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        );
+
+      // ── List View ──────────────────────────────────────────────────────────
+      case 'listview':
+        final items = _list(props, 'items', [
+          'Item 1',
+          'Item 2',
+          'Item 3',
+          'Item 4',
+          'Item 5',
+        ]);
+        final scrollDirection =
+            _s(props, 'scrollDirection', 'vertical') == 'horizontal'
+            ? Axis.horizontal
+            : Axis.vertical;
+        final padding = _d(props, 'padding', 0);
+        final spacing = _d(props, 'spacing', 0);
+        final scrollEnabled =
+            props['scrollEnabled'] != 'false' &&
+            props['scrollEnabled'] != false;
+
+        return SizedBox(
+          width: w,
+          height: h,
+          child: Container(
+            color: _c(props, 'backgroundColor', Colors.white),
+            child: ListView.separated(
+              scrollDirection: scrollDirection,
+              physics: scrollEnabled
+                  ? const AlwaysScrollableScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.all(padding),
+              itemCount: items.length,
+              separatorBuilder: (_, __) {
+                return spacing > 0
+                    ? SizedBox(
+                        height: scrollDirection == Axis.vertical ? spacing : 0,
+                        width: scrollDirection == Axis.horizontal ? spacing : 0,
+                      )
+                    : Divider(height: 1, color: Colors.grey[300]);
+              },
+              itemBuilder: (_, i) => Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: scrollDirection == Axis.horizontal ? 8 : 12,
+                  vertical: scrollDirection == Axis.vertical ? 6 : 0,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[200]!),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey[50],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.primary.withOpacity(0.2),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              color: AppTheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              items[i],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Item description',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 16,
+                        color: Colors.grey[400],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+      // ── Icon (icon_*) types ────────────────────────────────────────────────
       default:
+        // Handle dynamic icon types (icon_home, icon_search, etc.)
+        if (widgetModel.type.startsWith('icon_')) {
+          final iconName = widgetModel.type.replaceFirst('icon_', '');
+          final iconMap = {
+            'home': Icons.home,
+            'search': Icons.search,
+            'settings': Icons.settings,
+            'user': Icons.person,
+            'favorite': Icons.favorite,
+            'star': Icons.star,
+            'notification': Icons.notifications,
+            'menu': Icons.menu,
+            'camera': Icons.camera_alt,
+            'chat': Icons.chat,
+            'lock': Icons.lock,
+            'location': Icons.location_on,
+            'shopping_cart': Icons.shopping_cart,
+            'phone': Icons.phone,
+            'email': Icons.email,
+          };
+
+          final selectedIcon = iconMap[iconName] ?? Icons.help;
+
+          return SizedBox(
+            width: w,
+            height: h,
+            child: Center(
+              child: Icon(
+                selectedIcon,
+                color: _c(props, 'color', AppTheme.primary),
+                size: _d(props, 'size', 32),
+              ),
+            ),
+          );
+        }
+
+        // Default fallback for unknown widget types
         return SizedBox(
           width: w,
           height: h,
@@ -2492,15 +3246,22 @@ class WidgetRenderer extends StatelessWidget {
     width: w,
     height: h,
     decoration: BoxDecoration(
-      color: Colors.grey[200],
+      color: _themeSurfaceDark,
       borderRadius: BorderRadius.circular(8),
     ),
-    child: const Column(
+    child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.image_outlined, color: Colors.grey, size: 36),
-        SizedBox(height: 6),
-        Text('Image', style: TextStyle(color: Colors.grey, fontSize: 12)),
+        Icon(Icons.image_outlined, color: _themeTextMuted, size: 36),
+        const SizedBox(height: 6),
+        Text(
+          'Image',
+          style: TextStyle(
+            color: _themeTextMuted,
+            fontSize: 12,
+            fontFamily: _theme.fontFamily,
+          ),
+        ),
       ],
     ),
   );
@@ -2508,13 +3269,22 @@ class WidgetRenderer extends StatelessWidget {
   Widget _buildMenuItem(String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
-      border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+      border: Border(
+        bottom: BorderSide(color: _themeTextMuted.withOpacity(0.2)),
+      ),
     ),
     child: Row(
       children: [
-        const Icon(Icons.menu, size: 18),
+        Icon(Icons.menu, size: 18, color: _themeTextColor),
         const SizedBox(width: 12),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontFamily: _theme.fontFamily,
+            color: _themeTextColor,
+          ),
+        ),
       ],
     ),
   );
@@ -2522,7 +3292,7 @@ class WidgetRenderer extends StatelessWidget {
   Widget _buildAccordionItem(String title, String content) => Container(
     margin: const EdgeInsets.symmetric(vertical: 4),
     decoration: BoxDecoration(
-      border: Border.all(color: Colors.grey[300]!),
+      border: Border.all(color: _themeTextMuted.withOpacity(0.3)),
       borderRadius: BorderRadius.circular(4),
     ),
     child: Column(
@@ -2635,6 +3405,137 @@ class WidgetRenderer extends StatelessWidget {
       ],
     ),
   );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SwitchListTile Widget — Stateful for canvas preview
+// ══════════════════════════════════════════════════════════════════════════════
+class _SwitchListTileWidget extends StatefulWidget {
+  final Map<String, dynamic> props;
+  final double width, height;
+  const _SwitchListTileWidget({
+    required this.props,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  State<_SwitchListTileWidget> createState() => _SwitchListTileWidgetState();
+}
+
+class _SwitchListTileWidgetState extends State<_SwitchListTileWidget> {
+  late bool _isEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _isEnabled =
+        widget.props['value'] == 'true' || widget.props['value'] == true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: SwitchListTile(
+        value: _isEnabled,
+        onChanged: (v) {
+          setState(() => _isEnabled = v);
+        },
+        title: Text(
+          widget.props['title'] ?? 'Switch Option',
+          style: TextStyle(
+            fontSize: widget.props['fontSize'] ?? 14,
+            color: widget.props['textColor'] ?? Colors.black87,
+          ),
+        ),
+        subtitle: (widget.props['subtitle'] ?? '').toString().isNotEmpty
+            ? Text(
+                widget.props['subtitle'] ?? '',
+                style: TextStyle(
+                  fontSize: widget.props['subtitleSize'] ?? 12,
+                  color: Colors.grey,
+                ),
+              )
+            : null,
+        activeColor: Color(
+          int.parse(
+            (widget.props['activeColor'] ?? '0xFF6C63FF').toString().replaceAll(
+              '#',
+              '0x',
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CheckboxListTile Widget — Stateful for canvas preview
+// ══════════════════════════════════════════════════════════════════════════════
+class _CheckboxListTileWidget extends StatefulWidget {
+  final Map<String, dynamic> props;
+  final double width, height;
+  const _CheckboxListTileWidget({
+    required this.props,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  State<_CheckboxListTileWidget> createState() =>
+      _CheckboxListTileWidgetState();
+}
+
+class _CheckboxListTileWidgetState extends State<_CheckboxListTileWidget> {
+  late bool _isChecked;
+
+  @override
+  void initState() {
+    super.initState();
+    _isChecked =
+        widget.props['value'] == 'true' || widget.props['value'] == true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: CheckboxListTile(
+        value: _isChecked,
+        onChanged: (v) {
+          setState(() => _isChecked = v ?? false);
+        },
+        title: Text(
+          widget.props['title'] ?? 'Checkbox Option',
+          style: TextStyle(
+            fontSize: widget.props['fontSize'] ?? 14,
+            color: widget.props['textColor'] ?? Colors.black87,
+          ),
+        ),
+        subtitle: (widget.props['subtitle'] ?? '').toString().isNotEmpty
+            ? Text(
+                widget.props['subtitle'] ?? '',
+                style: TextStyle(
+                  fontSize: widget.props['subtitleSize'] ?? 12,
+                  color: Colors.grey,
+                ),
+              )
+            : null,
+        activeColor: Color(
+          int.parse(
+            (widget.props['activeColor'] ?? '0xFF6C63FF').toString().replaceAll(
+              '#',
+              '0x',
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3308,10 +4209,13 @@ class _MultiSelectWidgetState extends State<_MultiSelectWidget> {
 class _CheckboxWidget extends StatefulWidget {
   final Map<String, dynamic> props;
   final double width, height;
+  final BuilderProvider? provider;
+
   const _CheckboxWidget({
     required this.props,
     required this.width,
     required this.height,
+    this.provider,
   });
 
   @override
@@ -3320,6 +4224,26 @@ class _CheckboxWidget extends StatefulWidget {
 
 class _CheckboxWidgetState extends State<_CheckboxWidget> {
   late bool _checked;
+
+  ProjectTheme get _theme =>
+      widget.provider?.project?.theme ?? const ProjectTheme();
+
+  Color get _themeTextColor {
+    final hex = _theme.textColorHex;
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return _theme.isDarkMode ? Colors.white : Colors.black;
+    }
+  }
+
+  Color get _themePrimary {
+    try {
+      return Color(int.parse(_theme.primaryColor.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return AppTheme.primary;
+    }
+  }
 
   Color _c(String k, Color fb) {
     try {
@@ -3358,12 +4282,16 @@ class _CheckboxWidgetState extends State<_CheckboxWidget> {
             Checkbox(
               value: _checked,
               onChanged: (val) => setState(() => _checked = val ?? false),
-              activeColor: _c('color', AppTheme.primary),
+              activeColor: _c('color', _themePrimary),
             ),
             Expanded(
               child: Text(
                 widget.props['label']?.toString() ?? 'Checkbox',
-                style: const TextStyle(fontSize: 13),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontFamily: _theme.fontFamily,
+                  color: _c('textColor', _themeTextColor),
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -3434,7 +4362,10 @@ class _SwitchWidgetState extends State<_SwitchWidget> {
             Expanded(
               child: Text(
                 widget.props['label']?.toString() ?? 'Switch',
-                style: const TextStyle(fontSize: 13),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _c('textColor', Colors.black),
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -3485,11 +4416,227 @@ class _DropdownWidgetState extends State<_DropdownWidget> {
         child: DropdownButton<String>(
           isExpanded: true,
           value: _selected,
-          hint: Text(widget.props['hint']?.toString() ?? 'Select...'),
+          hint: Text(
+            widget.props['hint']?.toString() ?? 'Select...',
+            style: const TextStyle(color: Colors.grey),
+          ),
           items: options
-              .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+              .map(
+                (opt) => DropdownMenuItem(
+                  value: opt,
+                  child: Text(opt, style: const TextStyle(color: Colors.black)),
+                ),
+              )
               .toList(),
           onChanged: (val) => setState(() => _selected = val),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Bottom Nav Widget — Configurable navigation bar with unlimited dynamic tabs
+// Each tab can have custom icon, label, and optional navigation to screens
+// ══════════════════════════════════════════════════════════════════════════════
+class _BottomNavWidget extends StatefulWidget {
+  final Map<String, dynamic> props;
+  final double width, height;
+  final BuilderProvider? provider;
+  const _BottomNavWidget({
+    required this.props,
+    required this.width,
+    required this.height,
+    this.provider,
+  });
+
+  @override
+  State<_BottomNavWidget> createState() => _BottomNavWidgetState();
+}
+
+class _BottomNavWidgetState extends State<_BottomNavWidget> {
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = _getSelectedTabIndex();
+  }
+
+  @override
+  void didUpdateWidget(_BottomNavWidget old) {
+    super.didUpdateWidget(old);
+    _selectedIndex = _getSelectedTabIndex();
+  }
+
+  int _getSelectedTabIndex() {
+    final selected = widget.props['selectedTabIndex'];
+    return (selected is int) ? selected : 0;
+  }
+
+  Color _parseColor(String? hex, Color fallback) {
+    if (hex == null || hex.isEmpty) return fallback;
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  IconData _getIconData(String? iconName) {
+    switch (iconName) {
+      case 'home':
+        return Icons.home;
+      case 'search':
+        return Icons.search;
+      case 'cart':
+        return Icons.shopping_cart;
+      case 'profile':
+      case 'person':
+        return Icons.person;
+      case 'settings':
+        return Icons.settings;
+      case 'favorite':
+        return Icons.favorite;
+      case 'notifications':
+        return Icons.notifications;
+      case 'mail':
+      case 'email':
+        return Icons.mail;
+      case 'phone':
+        return Icons.phone;
+      case 'location':
+        return Icons.location_on;
+      case 'calendar':
+        return Icons.calendar_today;
+      case 'clock':
+      case 'time':
+        return Icons.schedule;
+      case 'menu':
+        return Icons.menu;
+      case 'star':
+        return Icons.star;
+      case 'heart':
+        return Icons.favorite;
+      default:
+        return Icons.apps;
+    }
+  }
+
+  List<Map<String, dynamic>> _getTabs() {
+    final tabs = widget.props['tabs'];
+    if (tabs is List && tabs.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(
+        tabs.map((t) => (t is Map) ? Map<String, dynamic>.from(t) : {}),
+      );
+    }
+    // Fallback to default tabs
+    return [
+      {
+        'icon': 'home',
+        'label': 'Tab 1',
+        'navigationEnabled': false,
+        'targetScreen': '',
+      },
+      {
+        'icon': 'search',
+        'label': 'Tab 2',
+        'navigationEnabled': false,
+        'targetScreen': '',
+      },
+      {
+        'icon': 'person',
+        'label': 'Tab 3',
+        'navigationEnabled': false,
+        'targetScreen': '',
+      },
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = _getTabs();
+    final activeColor = _parseColor(
+      widget.props['activeColor']?.toString(),
+      AppTheme.primary,
+    );
+    final inactiveColor = _parseColor(
+      widget.props['inactiveColor']?.toString(),
+      const Color(0xFF999999),
+    );
+
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(tabs.length, (index) {
+            final tab = tabs[index];
+            final isSelected = _selectedIndex == index;
+            final icon = tab['icon']?.toString() ?? 'home';
+            final label = tab['label']?.toString() ?? 'Tab ${index + 1}';
+            final navEnabled =
+                tab['navigationEnabled'] == true ||
+                tab['navigationEnabled'] == 'true';
+            // Clean targetScreen: extract ID from "name:id" format
+            final rawTargetScreen = tab['targetScreen']?.toString() ?? '';
+            final targetScreen = rawTargetScreen.contains(':')
+                ? rawTargetScreen.split(':').last.trim()
+                : rawTargetScreen;
+
+            return Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _selectedIndex = index);
+                  // ── FIX 17: Enhanced navigation with debug logging
+                  // Check if navigation is enabled, has a target screen ID, and provider exists
+                  if (navEnabled &&
+                      targetScreen.isNotEmpty &&
+                      widget.provider != null) {
+                    debugPrint(
+                      '🔄 Bottom Nav Tab $index clicked → '
+                      'Switching to screen: $targetScreen',
+                    );
+                    widget.provider!.setCurrentScreen(targetScreen);
+                  }
+                },
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Icon(
+                      _getIconData(icon),
+                      color: isSelected ? activeColor : inactiveColor,
+                      size: 24,
+                    ),
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected ? activeColor : inactiveColor,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );
@@ -3725,4 +4872,228 @@ class _Task {
   String text;
   bool done = false;
   _Task(this.text);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Tabs Widget — Shows all tab contents vertically (not switching views)
+// ══════════════════════════════════════════════════════════════════════════════
+class _TabsWidget extends StatefulWidget {
+  final Map<String, dynamic> props;
+  final double width, height;
+  const _TabsWidget({
+    required this.props,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  State<_TabsWidget> createState() => _TabsWidgetState();
+}
+
+class _TabsWidgetState extends State<_TabsWidget> {
+  late int _activeTab;
+
+  Color _c(String k, Color fb) {
+    try {
+      final hex = widget.props[k] as String? ?? '';
+      if (hex.isEmpty) return fb;
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return fb;
+    }
+  }
+
+  double _d(String k, double fb) {
+    try {
+      final v = widget.props[k];
+      if (v is num) return v.toDouble();
+      if (v is String) return double.parse(v);
+      return fb;
+    } catch (_) {
+      return fb;
+    }
+  }
+
+  List<dynamic> _list(String k, List<dynamic> fb) {
+    try {
+      final v = widget.props[k];
+      if (v is List) return v;
+      if (v is String) return v.split(',').map((s) => s.trim()).toList();
+      return fb;
+    } catch (_) {
+      return fb;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _activeTab = _d('activeTab', 0).toInt().clamp(0, 9);
+  }
+
+  @override
+  void didUpdateWidget(_TabsWidget old) {
+    super.didUpdateWidget(old);
+    _activeTab = _d('activeTab', 0).toInt().clamp(0, 9);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tabCount = _d('tabs', 3).toInt().clamp(1, 10);
+    final tabLabels = _list(
+      'tabLabels',
+      List.generate(tabCount, (i) => 'Tab ${i + 1}'),
+    );
+    final fontSize = _d('fontSize', 14);
+    final activeTabColor = _c('activeTabColor', AppTheme.primary);
+    final inactiveTabColor = _c('inactiveTabColor', Colors.grey);
+    final contentBgColor = _c('contentBgColor', Colors.white);
+
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Tab headers - clickable to change active tab
+            Container(
+              color: Colors.grey[100],
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(tabCount, (index) {
+                    final isActive = index == _activeTab;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _activeTab = index;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isActive
+                                    ? activeTabColor
+                                    : Colors.transparent,
+                                width: isActive ? 3 : 0,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            tabLabels[index].toString(),
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: isActive
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: isActive
+                                  ? activeTabColor
+                                  : inactiveTabColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+
+            // All tab contents displayed vertically
+            ...List.generate(
+              tabCount,
+              (index) => Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: contentBgColor,
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tab content header with highlight if active
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: index == _activeTab
+                            ? activeTabColor.withOpacity(0.08)
+                            : Colors.transparent,
+                        border: Border(
+                          left: BorderSide(
+                            color: index == _activeTab
+                                ? activeTabColor
+                                : Colors.transparent,
+                            width: 4,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            tabLabels[index].toString(),
+                            style: TextStyle(
+                              fontSize: fontSize - 1,
+                              fontWeight: FontWeight.w600,
+                              color: index == _activeTab
+                                  ? activeTabColor
+                                  : Colors.black54,
+                            ),
+                          ),
+                          if (index == _activeTab)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Icon(
+                                Icons.check_circle,
+                                size: 16,
+                                color: activeTabColor,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // Tab content
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Content ${index + 1}',
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'This is the content section for ${tabLabels[index]}. All tabs are visible at once.',
+                            style: TextStyle(
+                              fontSize: fontSize - 2,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

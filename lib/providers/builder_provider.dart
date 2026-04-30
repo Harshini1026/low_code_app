@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/project_model.dart';
 import '../models/screen_model.dart';
 import '../models/widget_model.dart';
 import '../services/firestore_service.dart';
+import '../services/project_persistence_service.dart';
 
 class BuilderProvider extends ChangeNotifier {
+  // ── Service instances ─────────────────────────────────────────────────
   final _fs = FirestoreService();
+  final _persistence = ProjectPersistenceService();
   final _uuid = const Uuid();
-  ProjectModel? _project;
-  bool get canUndo => _history.isNotEmpty;
 
+  // ── Private fields (declare all fields BEFORE getters) ─────────────────
+  ProjectModel? _project;
   int _activeScreen = 0;
   WidgetModel? _selectedWidget;
-  bool _isLoading = false, _isSaving = false;
+  bool _isLoading = false;
+  bool _isSaving = false;
+  DateTime? _lastSavedTime;
   final List<ProjectModel> _history = [];
+  List<ProjectModel> _allProjects = [];
+  String? _currentActiveProjectId;
 
+  // ── Public getters (declare AFTER all fields) ───────────────────────────
+  bool get canUndo => _history.isNotEmpty;
   ProjectModel? get project => _project;
   int get activeScreenIndex => _activeScreen;
   AppScreen? get activeScreen => _project?.screens.isNotEmpty == true
@@ -25,15 +35,54 @@ class BuilderProvider extends ChangeNotifier {
   WidgetModel? get selectedWidget => _selectedWidget;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
+  DateTime? get lastSavedTime => _lastSavedTime;
+  List<ProjectModel> get allProjects => _allProjects;
+  String? get currentActiveProjectId => _currentActiveProjectId;
   List<WidgetModel> get currentWidgets => activeScreen?.widgets ?? [];
 
   Future<void> loadProject(String id) async {
-    _isLoading = true;
-    notifyListeners();
-    _project = await _fs.getProject(id);
-    _activeScreen = 0;
-    _isLoading = false;
-    notifyListeners();
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      // ✅ FIX: Get userId from current Firebase user
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+      // ✅ FIX: Try persistence service first (local + Firebase fallback)
+      ProjectModel? loaded =
+          await _persistence.loadProject(id, userId) ??
+          await _fs.getProject(id);
+
+      // ✅ PREVENT EMPTY OVERWRITE: Only set if project loaded successfully
+      if (loaded != null) {
+        _project = loaded;
+        _currentActiveProjectId = loaded.id;
+        _activeScreen = 0;
+      } else {
+        debugPrint('⚠️ Project failed to load: $id');
+        _project = null;
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error loading project: $e');
+      _isLoading = false;
+      _project = null;
+      notifyListeners();
+    }
+  }
+
+  /// Load all projects for current user (from local cache)
+  Future<void> loadAllProjects(String userId) async {
+    try {
+      _allProjects = await _persistence.getCachedUserProjects(userId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error loading all projects: $e');
+      _allProjects = [];
+      notifyListeners();
+    }
   }
 
   void setActiveScreen(int i) {
@@ -68,6 +117,26 @@ class BuilderProvider extends ChangeNotifier {
     final screens = [..._project!.screens]..removeAt(i);
     _project = _project!.copyWith(screens: screens);
     if (_activeScreen >= screens.length) _activeScreen = screens.length - 1;
+    notifyListeners();
+    _autosave();
+  }
+
+  void renameScreen(int i, String newName) {
+    if (_project == null || newName.trim().isEmpty) return;
+    _saveHistory();
+    final screens = _project!.screens
+        .asMap()
+        .map(
+          (idx, s) => MapEntry(
+            idx,
+            idx == i
+                ? AppScreen(id: s.id, name: newName.trim(), widgets: s.widgets)
+                : s,
+          ),
+        )
+        .values
+        .toList();
+    _project = _project!.copyWith(screens: screens);
     notifyListeners();
     _autosave();
   }
@@ -110,6 +179,7 @@ class BuilderProvider extends ChangeNotifier {
       _selectedWidget!.y = y.clamp(0, 680);
     }
     notifyListeners();
+    _autosave();
   }
 
   void updateWidgetProperty(String id, String key, dynamic value) {
@@ -178,6 +248,97 @@ class BuilderProvider extends ChangeNotifier {
     _autosave();
   }
 
+  // ── NEW: Add a child widget to a Row/Column
+  void addChildWidget(String parentId, String childType) {
+    _updateWidget(parentId, (parent) {
+      if (parent.type == 'row' || parent.type == 'column') {
+        final childWidget = WidgetModel(
+          id: _uuid.v4(),
+          type: childType,
+          x: 0,
+          y: 0,
+          width: 100,
+          height: WidgetModel.defaultHeightFor(childType),
+          properties: Map<String, dynamic>.from(
+            WidgetModel.defaultPropsFor(childType),
+          ),
+        );
+        parent.children = [...parent.children, childWidget];
+      } else if (parent.type == 'singlechildscrollview') {
+        // ── SingleChildScrollView: Only allow ONE child
+        // If a child already exists, replace it (or show warning)
+        final childWidget = WidgetModel(
+          id: _uuid.v4(),
+          type: childType,
+          x: 0,
+          y: 0,
+          width: 100,
+          height: WidgetModel.defaultHeightFor(childType),
+          properties: Map<String, dynamic>.from(
+            WidgetModel.defaultPropsFor(childType),
+          ),
+        );
+        parent.children = [childWidget];
+      }
+    });
+    if (_selectedWidget?.id == parentId) {
+      _selectedWidget = activeScreen?.widgets.firstWhere(
+        (w) => w.id == parentId,
+        orElse: () => _selectedWidget!,
+      );
+    }
+    notifyListeners();
+    _autosave();
+  }
+
+  // ── NEW: Remove a child widget from Row/Column
+  void removeChildWidget(String parentId, String childId) {
+    _updateWidget(parentId, (parent) {
+      parent.children = parent.children.where((c) => c.id != childId).toList();
+    });
+    notifyListeners();
+    _autosave();
+  }
+
+  // ── NEW: Update a child widget's properties
+  void updateChildProperty(
+    String parentId,
+    String childId,
+    String key,
+    dynamic value,
+  ) {
+    _updateWidget(parentId, (parent) {
+      for (final child in parent.children) {
+        if (child.id == childId) {
+          child.properties[key] = value;
+          break;
+        }
+      }
+    });
+    notifyListeners();
+    _autosave();
+  }
+
+  // ── NEW: Update child widget size
+  void updateChildSize(
+    String parentId,
+    String childId,
+    double width,
+    double height,
+  ) {
+    _updateWidget(parentId, (parent) {
+      for (final child in parent.children) {
+        if (child.id == childId) {
+          child.width = width.clamp(40, 320);
+          child.height = height.clamp(20, 600);
+          break;
+        }
+      }
+    });
+    notifyListeners();
+    _autosave();
+  }
+
   void updateTheme(ProjectTheme theme) {
     _project = _project?.copyWith(theme: theme);
     notifyListeners();
@@ -239,13 +400,70 @@ class BuilderProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _autosave() async {
-    if (_project == null) return;
+  /// Debounced auto-save on every change
+  /// Fires after 400ms of inactivity to avoid excessive writes
+  void _autosave() {
+    // ✅ PREVENT EMPTY OVERWRITE: Only save if project exists and has data
+    if (_project == null || _project!.id.isEmpty) {
+      return;
+    }
+
     _isSaving = true;
     notifyListeners();
-    await _fs.updateProject(_project!);
+
+    _persistence.debouncedSaveProject(_project!);
+
+    // Reset saving state after a short delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_isSaving) {
+        _isSaving = false;
+        _lastSavedTime = DateTime.now();
+        notifyListeners();
+      }
+    });
+  }
+
+  /// Immediately save current project without debounce
+  /// Use before switching projects or on critical operations
+  Future<void> saveCurrentProject() async {
+    // ✅ PREVENT EMPTY OVERWRITE: Only save if project exists and has data
+    if (_project == null || _project!.id.isEmpty) {
+      debugPrint('⚠️ Skipping save: Project is empty or null');
+      return;
+    }
+
+    _isSaving = true;
+    notifyListeners();
+
+    try {
+      await _persistence.saveProjectImmediately(_project!);
+      _lastSavedTime = DateTime.now();
+    } catch (e) {
+      debugPrint('❌ Save failed: $e');
+    }
+
     _isSaving = false;
     notifyListeners();
+  }
+
+  /// Switch to another project with auto-save of current
+  Future<void> switchProject(String newProjectId) async {
+    // Save current project before switching
+    if (_project != null) {
+      await saveCurrentProject();
+    }
+
+    // Load new project
+    await loadProject(newProjectId);
+    _currentActiveProjectId = newProjectId;
+    notifyListeners();
+  }
+
+  /// Cleanup on provider disposal
+  @override
+  void dispose() {
+    _persistence.cancelPendingSaves();
+    super.dispose();
   }
 
   void applyProject(ProjectModel updated) {

@@ -11,6 +11,8 @@ import 'core/router/app_router.dart';
 import 'providers/auth_provider.dart';
 import 'providers/builder_provider.dart';
 import 'providers/chat_provider.dart';
+import 'services/project_persistence_service.dart';
+import 'config/network_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +38,10 @@ void main() async {
   await Hive.initFlutter();
   await Hive.openBox('appforge_cache');
 
+  // ✅ Initialize ProjectPersistenceService for auto-save
+  final persistenceService = ProjectPersistenceService();
+  await persistenceService.init();
+
   // ✅ Lock orientation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -46,6 +52,9 @@ void main() async {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
+
+  // ✅ Initialize NetworkConfig - detects system IP for backend connection
+  await NetworkConfig.initialize();
 
   runApp(const AppForgeApp());
 }

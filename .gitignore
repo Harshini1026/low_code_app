@@ -55,3 +55,21 @@ package-lock.json
 # Build directories
 /dist/
 .dart_tool/
+
+# Auto-generated documentation and build artifacts
+AUTO_*.md
+*_IMPLEMENTATION_COMPLETE.md
+*_QUICK_*.md
+*_FIX_*.md
+PROJECT_DISAPPEAR_FIX_SUMMARY.md
+ROW_COLUMN_*.md
+TEXT_*.md
+THEME_*.md
+VERIFICATION_*.md
+WIDGETS_*.md
+FILES_REFERENCE.md
+BEFORE_AFTER_COMPARISON.md
+linux/flutter/generated_*
+macos/Flutter/GeneratedPluginRegistrant.swift
+windows/flutter/generated_*
+windows/runner/resources/app_icon.ico

@@ -306,14 +306,8 @@ class _TableCard extends StatelessWidget {
   final VoidCallback onDelete;
   const _TableCard({required this.table, required this.onDelete});
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 8),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: AppTheme.darkSurface,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppTheme.darkBorder),
-    ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -391,14 +385,8 @@ class _AddTableForm extends StatelessWidget {
     required this.onCancel,
   });
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 8),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: AppTheme.darkSurface,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppTheme.primary),
-    ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -472,28 +460,25 @@ class _AddTableButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
-    child: Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.darkBorder),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.add, color: AppTheme.primary, size: 16),
-          SizedBox(width: 6),
-          Text(
-            'Create Table',
-            style: TextStyle(
-              color: AppTheme.primary,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, color: AppTheme.primary, size: 16),
+            SizedBox(width: 6),
+            Text(
+              'Create Table',
+              style: TextStyle(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );

@@ -206,51 +206,60 @@ class _LoginScreenState extends State<LoginScreen>
               const SizedBox(height: 36),
 
               // ── Tab switcher ──────────────────────────────────────────────
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeInOut,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppTheme.darkCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.darkBorder),
-                ),
-                child: TabBar(
-                  controller: _tabs,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicator: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF4F6FFF), Color(0xFF7C3AED)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+              Center(
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.75,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    height: 50,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.darkBorder),
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blueAccent.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
+                    child: TabBar(
+                      controller: _tabs,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF4F6FFF),
+                            AppTheme.primary.withOpacity(0.4),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blueAccent.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white60,
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                      labelPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      tabs: const [
+                        Tab(text: 'Sign In'),
+                        Tab(text: 'Sign Up'),
+                      ],
+                    ),
                   ),
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white60,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                  labelPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  tabs: const [
-                    Tab(text: 'Sign In'),
-                    Tab(text: 'Sign Up'),
-                  ],
                 ),
               ).animate().fadeIn(delay: 400.ms),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // ── Role loading indicator ────────────────────────────────────
               if (_loadingRole)
@@ -325,88 +334,113 @@ class _LoginScreenState extends State<LoginScreen>
 
               // ── Tab forms ─────────────────────────────────────────────────
               if (!_loadingRole)
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: _tabs.index == 0
-                      ? _SignInForm(
-                          key: const ValueKey('signin'),
-                          emailCtrl: _signInEmail,
-                          passwordCtrl: _signInPassword,
-                          obscure: _obscureSignIn,
-                          onToggleObscure: () =>
-                              setState(() => _obscureSignIn = !_obscureSignIn),
-                          onSignIn: () => _signIn(auth),
-                          onForgot: () => _forgotPassword(auth),
-                          // ✅ uses local _loading, not auth.isLoading
-                          loading: _loading,
-                        )
-                      : _SignUpForm(
-                          key: const ValueKey('signup'),
-                          nameCtrl: _signUpName,
-                          emailCtrl: _signUpEmail,
-                          passwordCtrl: _signUpPassword,
-                          confirmCtrl: _signUpConfirm,
-                          obscurePass: _obscureSignUp,
-                          obscureConfirm: _obscureConfirm,
-                          onTogglePass: () =>
-                              setState(() => _obscureSignUp = !_obscureSignUp),
-                          onToggleConfirm: () => setState(
-                            () => _obscureConfirm = !_obscureConfirm,
-                          ),
-                          onSignUp: () => _signUp(auth),
-                          loading: _loading,
-                        ),
-                ),
-
-              const SizedBox(height: 20),
-
-              // ── Divider ───────────────────────────────────────────────────
-              Row(
-                children: [
-                  const Expanded(child: Divider(color: AppTheme.darkBorder)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'or',
-                      style: TextStyle(
-                        color: AppTheme.textMuted.withOpacity(0.7),
-                        fontSize: 13,
-                      ),
+                Center(
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.75,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: _tabs.index == 0
+                          ? _SignInForm(
+                              key: const ValueKey('signin'),
+                              emailCtrl: _signInEmail,
+                              passwordCtrl: _signInPassword,
+                              obscure: _obscureSignIn,
+                              onToggleObscure: () => setState(
+                                () => _obscureSignIn = !_obscureSignIn,
+                              ),
+                              onSignIn: () => _signIn(auth),
+                              onForgot: () => _forgotPassword(auth),
+                              // ✅ uses local _loading, not auth.isLoading
+                              loading: _loading,
+                            )
+                          : _SignUpForm(
+                              key: const ValueKey('signup'),
+                              nameCtrl: _signUpName,
+                              emailCtrl: _signUpEmail,
+                              passwordCtrl: _signUpPassword,
+                              confirmCtrl: _signUpConfirm,
+                              obscurePass: _obscureSignUp,
+                              obscureConfirm: _obscureConfirm,
+                              onTogglePass: () => setState(
+                                () => _obscureSignUp = !_obscureSignUp,
+                              ),
+                              onToggleConfirm: () => setState(
+                                () => _obscureConfirm = !_obscureConfirm,
+                              ),
+                              onSignUp: () => _signUp(auth),
+                              loading: _loading,
+                            ),
                     ),
                   ),
-                  const Expanded(child: Divider(color: AppTheme.darkBorder)),
-                ],
+                ),
+
+              const SizedBox(height: 16),
+
+              // ── Divider ───────────────────────────────────────────────────
+              Center(
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.75,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: const Divider(
+                          thickness: 1,
+                          color: AppTheme.darkBorder,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'or',
+                          style: TextStyle(
+                            color: AppTheme.textMuted.withOpacity(0.7),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: const Divider(
+                          thickness: 1,
+                          color: AppTheme.darkBorder,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
 
               const SizedBox(height: 16),
 
               // ── Google Sign-In ────────────────────────────────────────────
               if (!_loadingRole)
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _loading ? null : () => _googleSignIn(auth),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(color: AppTheme.darkBorder),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                Center(
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.75,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : () => _googleSignIn(auth),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: AppTheme.darkBorder),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    icon: const Text(
-                      'G',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
+                      icon: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                    label: const Text(
-                      'Continue with Google',
-                      style: TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                      label: const Text(
+                        'Continue with Google',
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -421,7 +455,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-// ── Sign In form (unchanged UI) ───────────────────────────────────────────────
+// ── Sign In form (improved layout) ─────────────────────────────────────────────
 class _SignInForm extends StatelessWidget {
   final TextEditingController emailCtrl, passwordCtrl;
   final bool obscure, loading;
@@ -439,70 +473,85 @@ class _SignInForm extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      _Field(
-        ctrl: emailCtrl,
-        hint: 'Email address',
-        icon: Icons.email_outlined,
-        type: TextInputType.emailAddress,
-      ),
-      const SizedBox(height: 12),
-      _Field(
-        ctrl: passwordCtrl,
-        hint: 'Password',
-        icon: Icons.lock_outline,
-        obscure: obscure,
-        suffix: IconButton(
-          icon: Icon(
-            obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-            size: 20,
-            color: AppTheme.textMuted,
-          ),
-          onPressed: onToggleObscure,
-        ),
-      ),
-      Align(
-        alignment: Alignment.centerRight,
-        child: TextButton(
-          onPressed: onForgot,
-          child: const Text(
-            'Forgot password?',
-            style: TextStyle(color: AppTheme.primary, fontSize: 13),
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      children: [
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: _Field(
+            ctrl: emailCtrl,
+            hint: 'Email address',
+            icon: Icons.email_outlined,
+            type: TextInputType.emailAddress,
           ),
         ),
-      ),
-      const SizedBox(height: 8),
-      SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: loading ? null : onSignIn,
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: _Field(
+            ctrl: passwordCtrl,
+            hint: 'Password',
+            icon: Icons.lock_outline,
+            obscure: obscure,
+            suffix: IconButton(
+              icon: Icon(
+                obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
+                color: AppTheme.textMuted,
+              ),
+              onPressed: onToggleObscure,
             ),
           ),
-          child: loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text(
-                  'Sign In',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
         ),
-      ),
-    ],
+        const SizedBox(height: 8),
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: onForgot,
+              child: const Text(
+                'Forgot password?',
+                style: TextStyle(color: AppTheme.primary, fontSize: 13),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: ElevatedButton(
+            onPressed: loading ? null : onSignIn,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F6FFF),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Sign In',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
-// ── Sign Up form (unchanged UI) ───────────────────────────────────────────────
+// ── Sign Up form (improved layout) ────────────────────────────────────────────
 class _SignUpForm extends StatelessWidget {
   final TextEditingController nameCtrl, emailCtrl, passwordCtrl, confirmCtrl;
   final bool obscurePass, obscureConfirm, loading;
@@ -523,77 +572,96 @@ class _SignUpForm extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      _Field(ctrl: nameCtrl, hint: 'Full name', icon: Icons.person_outline),
-      const SizedBox(height: 12),
-      _Field(
-        ctrl: emailCtrl,
-        hint: 'Email address',
-        icon: Icons.email_outlined,
-        type: TextInputType.emailAddress,
-      ),
-      const SizedBox(height: 12),
-      _Field(
-        ctrl: passwordCtrl,
-        hint: 'Password (min 6 chars)',
-        icon: Icons.lock_outline,
-        obscure: obscurePass,
-        suffix: IconButton(
-          icon: Icon(
-            obscurePass
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-            size: 20,
-            color: AppTheme.textMuted,
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      children: [
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: _Field(
+            ctrl: nameCtrl,
+            hint: 'Full name',
+            icon: Icons.person_outline,
           ),
-          onPressed: onTogglePass,
         ),
-      ),
-      const SizedBox(height: 12),
-      _Field(
-        ctrl: confirmCtrl,
-        hint: 'Confirm password',
-        icon: Icons.lock_outline,
-        obscure: obscureConfirm,
-        suffix: IconButton(
-          icon: Icon(
-            obscureConfirm
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-            size: 20,
-            color: AppTheme.textMuted,
+        const SizedBox(height: 16),
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: _Field(
+            ctrl: emailCtrl,
+            hint: 'Email address',
+            icon: Icons.email_outlined,
+            type: TextInputType.emailAddress,
           ),
-          onPressed: onToggleConfirm,
         ),
-      ),
-      const SizedBox(height: 20),
-      SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: loading ? null : onSignUp,
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: _Field(
+            ctrl: passwordCtrl,
+            hint: 'Password (min 6 chars)',
+            icon: Icons.lock_outline,
+            obscure: obscurePass,
+            suffix: IconButton(
+              icon: Icon(
+                obscurePass
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
+                color: AppTheme.textMuted,
+              ),
+              onPressed: onTogglePass,
             ),
           ),
-          child: loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text(
-                  'Create Account',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
         ),
-      ),
-    ],
+        const SizedBox(height: 16),
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: _Field(
+            ctrl: confirmCtrl,
+            hint: 'Confirm password',
+            icon: Icons.lock_outline,
+            obscure: obscureConfirm,
+            suffix: IconButton(
+              icon: Icon(
+                obscureConfirm
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
+                color: AppTheme.textMuted,
+              ),
+              onPressed: onToggleConfirm,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: MediaQuery.of(context).size.width * 0.75,
+          child: ElevatedButton(
+            onPressed: loading ? null : onSignUp,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F6FFF),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Create Account',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 

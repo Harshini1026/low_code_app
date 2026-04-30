@@ -4,17 +4,40 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/builder_provider.dart';
 import '../../models/project_model.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/floating_ai_button.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _loadProjects();
+  }
+
+  Future<void> _loadProjects() async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.user?.uid;
+    if (userId != null) {
+      final builder = context.read<BuilderProvider>();
+      await builder.loadAllProjects(userId);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
+    final builder = context.watch<BuilderProvider>();
+    final projects = builder.allProjects;
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
@@ -74,7 +97,11 @@ class HomeScreen extends StatelessWidget {
             ? FirestoreService().getUserProjects(user.uid)
             : const Stream.empty(),
         builder: (context, snapshot) {
-          final projects = snapshot.data ?? [];
+          // Use cached local projects first, fall back to Firebase stream
+          final displayProjects = projects.isNotEmpty
+              ? projects
+              : (snapshot.data ?? []);
+
           return CustomScrollView(
             slivers: [
               // Welcome Banner
@@ -109,7 +136,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              '${projects.length} project${projects.length != 1 ? 's' : ''} in your workspace',
+                              '${displayProjects.length} project${displayProjects.length != 1 ? 's' : ''} in your workspace',
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13,
@@ -152,21 +179,21 @@ class HomeScreen extends StatelessWidget {
                     children: [
                       _StatCard(
                         'Projects',
-                        '${projects.length}',
+                        '${displayProjects.length}',
                         Icons.folder_outlined,
                         AppTheme.primary,
                       ),
                       const SizedBox(width: 12),
                       _StatCard(
                         'Published',
-                        '${projects.where((p) => p.status == 'published').length}',
+                        '${displayProjects.where((p) => p.status == 'published').length}',
                         Icons.rocket_launch_outlined,
                         AppTheme.secondary,
                       ),
                       const SizedBox(width: 12),
                       _StatCard(
                         'Drafts',
-                        '${projects.where((p) => p.status == 'draft').length}',
+                        '${displayProjects.where((p) => p.status == 'draft').length}',
                         Icons.edit_outlined,
                         AppTheme.accent,
                       ),
@@ -210,7 +237,8 @@ class HomeScreen extends StatelessWidget {
               ),
 
               // Projects
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  displayProjects.isEmpty)
                 const SliverToBoxAdapter(
                   child: Center(
                     child: Padding(
@@ -219,7 +247,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 )
-              else if (projects.isEmpty)
+              else if (displayProjects.isEmpty)
                 SliverToBoxAdapter(
                   child: _EmptyState(
                     onCreateTap: () => context.go('/templates'),
@@ -230,15 +258,16 @@ class HomeScreen extends StatelessWidget {
                   delegate: SliverChildBuilderDelegate(
                     (ctx, i) =>
                         _ProjectCard(
-                              project: projects[i],
+                              project: displayProjects[i],
                               userId: user!.uid,
-                              onOpen: () =>
-                                  context.go('/builder/${projects[i].id}'),
+                              onOpen: () => context.go(
+                                '/builder/${displayProjects[i].id}',
+                              ),
                             )
                             .animate()
                             .fadeIn(delay: Duration(milliseconds: i * 60))
                             .slideX(begin: 0.15),
-                    childCount: projects.length,
+                    childCount: displayProjects.length,
                   ),
                 ),
 

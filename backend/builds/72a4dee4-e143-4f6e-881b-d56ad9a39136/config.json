@@ -1,1 +1,0 @@
-{"id":"efcfdf1c-e210-45ed-a864-cf70248a399d","name":"To-do App","createdAt":"2026-04-18T16:00:45.308","screens":[{"id":"350412b7-1b2f-4fd8-a667-3c40d1a2c80c","name":"Home","widgets":[{"id":"113a9ab6-69f9-43a7-a960-8051d621d0d0","type":"todo","x":40,"y":80,"width":300,"height":300,"properties":{"emptyMessage":"No tasks yet. Add one!","color":"#00C896","title":"My Tasks"}}]}]}

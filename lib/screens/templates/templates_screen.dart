@@ -5,7 +5,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/template_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/builder_provider.dart';
 import '../../services/firestore_service.dart';
+import '../../services/project_persistence_service.dart';
 import '../../widgets/floating_ai_button.dart';
 
 class TemplatesScreen extends StatefulWidget {
@@ -77,6 +79,22 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
         template, user.uid,
         nameCtrl.text.trim().isEmpty ? '${template.name} App' : nameCtrl.text.trim(),
       );
+
+      // ✅ FIX 6: Save the new project to local persistence immediately
+      if (mounted) {
+        // Load it first to get the full project data
+        final builder = context.read<BuilderProvider>();
+        await builder.loadProject(projectId);
+        final newProject = builder.project;
+        
+        if (newProject != null) {
+          // Save to local storage
+          final persistence = ProjectPersistenceService();
+          await persistence.init();
+          await persistence.saveProjectImmediately(newProject);
+        }
+      }
+
       if (mounted) context.go('/builder/$projectId');
     } catch (e) {
       if (mounted) {
@@ -165,13 +183,13 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-              // ✅ KEY FIX: childAspectRatio 0.68 gives cards enough height
+              // ✅ MEDIUM HEIGHT FIX: childAspectRatio 1.4 creates 160-200px cards
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.68, // ✅ was 0.82
+                    childAspectRatio: 1.4, // ✅ reduced from 0.68 for compact height
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                   ),
@@ -297,7 +315,7 @@ class _TemplateCardState extends State<_TemplateCard> {
 
                 // Emoji strip — fixed height
                 Container(
-                  height: 82, // ✅ reduced from 90
+                  height: 60, // ✅ reduced from 82 for compact cards
                   decoration: BoxDecoration(
                     color: t.primaryColor.withOpacity(0.15),
                     border: Border(
@@ -305,14 +323,14 @@ class _TemplateCardState extends State<_TemplateCard> {
                   ),
                   child: Center(
                     child: Text(t.emoji,
-                        style: const TextStyle(fontSize: 40)), // ✅ reduced from 44
+                        style: const TextStyle(fontSize: 32)), // ✅ reduced from 40
                   ),
                 ),
 
                 // Info section — Expanded fills remaining space
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -324,45 +342,45 @@ class _TemplateCardState extends State<_TemplateCard> {
                           style: const TextStyle(
                             color: AppTheme.textPrimary,
                             fontWeight: FontWeight.w800,
-                            fontSize: 13,
+                            fontSize: 12,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 2),
 
                         // Category dot + label
                         Row(children: [
                           Container(
-                            width: 7, height: 7,
+                            width: 6, height: 6,
                             decoration: BoxDecoration(
                                 color: t.primaryColor, shape: BoxShape.circle),
                           ),
-                          const SizedBox(width: 5),
+                          const SizedBox(width: 4),
                           Expanded(
                             child: Text(t.category,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  color: AppTheme.textMuted, fontSize: 11),
+                                  color: AppTheme.textMuted, fontSize: 10),
                             ),
                           ),
                         ]),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
 
                         // Screen chips
                         Wrap(
-                          spacing: 4, runSpacing: 4,
-                          children: t.defaultScreens.take(3).map((s) =>
+                          spacing: 3, runSpacing: 2,
+                          children: t.defaultScreens.take(2).map((s) =>
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                  horizontal: 5, vertical: 1),
                               decoration: BoxDecoration(
                                 color: t.primaryColor.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(5),
                               ),
                               child: Text(s,
                                 style: TextStyle(
                                   color: t.primaryColor,
-                                  fontSize: 9,
+                                  fontSize: 8,
                                   fontWeight: FontWeight.w600,
                                 )),
                             ),
@@ -375,23 +393,23 @@ class _TemplateCardState extends State<_TemplateCard> {
 
                 // Use Template button — pinned to bottom
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                  padding: const EdgeInsets.fromLTRB(10, 3, 10, 8),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
                     decoration: BoxDecoration(
                       color: _hovered
                           ? t.primaryColor
                           : t.primaryColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
                       child: Text('Use Template',
                         style: TextStyle(
                           color: _hovered ? Colors.white : t.primaryColor,
                           fontWeight: FontWeight.w700,
-                          fontSize: 12,
+                          fontSize: 11,
                         )),
                     ),
                   ),

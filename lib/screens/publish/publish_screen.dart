@@ -2,14 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/project_model.dart';
 import '../../services/firestore_service.dart';
 import '../../services/build_service.dart';
-import '../../services/apk_download_service.dart';
 import '../../widgets/floating_ai_button.dart';
 
 class PublishScreen extends StatefulWidget {
@@ -46,6 +42,193 @@ class _PublishScreenState extends State<PublishScreen> {
     });
   }
 
+  /// Show build confirmation dialog before starting build
+  void _showBuildDialog() {
+    if (_project == null) {
+      _showError('Project not loaded');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: AppTheme.darkCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              const Text(
+                '🚀 Build & Publish',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You\'re about to build your app for Android',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+
+              // App Details
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.darkBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.darkBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'App Name:',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _project?.name ?? 'Unknown',
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text(
+                          'Platform:',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          '📱 Android APK',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text(
+                          'Screens:',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_project?.screens.length ?? 0} screens',
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Info
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppTheme.primary, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Build will take 2-5 minutes to complete',
+                        style: TextStyle(color: AppTheme.primary, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _startBuild();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFF4F6FFF),
+                      ),
+                      icon: const Text('⚙️', style: TextStyle(fontSize: 16)),
+                      label: const Text(
+                        'Build APK',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _startBuild() async {
     if (_project == null) {
       _showError('Project not loaded');
@@ -66,27 +249,137 @@ class _PublishScreenState extends State<PublishScreen> {
       _buildLogs = ['📋 Initializing build process...'];
     });
 
-    try {
-      // Call real build service
-      _buildLogs.add('🔄 Submitting build request to backend...');
-      _updateLogs();
+    // Step 1: Check backend connection BEFORE attempting any build
+    _buildLogs.add('⏳ Checking backend connection...');
+    _updateLogs();
 
-      final downloadUrl = await BuildService.requestApkBuild(
-        _project!,
-        onProgress: _updateProgress,
+    try {
+      final connectionError = await BuildService.checkBackendConnection(
+        onStatusUpdate: (status) {
+          _buildLogs.add(status);
+          _updateLogs();
+        },
       );
 
-      if (!mounted) return;
+      if (connectionError != null) {
+        // Backend not running - show error and exit immediately
+        // Do NOT retry on backend errors
+        _buildLogs.add('');
+        _buildLogs.add(
+          '═══════════════════════════════════════════════════════',
+        );
+        _buildLogs.add('❌ BACKEND NOT RUNNING');
+        _buildLogs.add(
+          '═══════════════════════════════════════════════════════',
+        );
+        _buildLogs.add('');
+        _buildLogs.add(connectionError);
+        _buildLogs.add('');
+        _updateLogs();
 
-      setState(() {
-        _downloadUrl = downloadUrl;
-        _buildLogs.add('✅ Build completed successfully!');
-        _buildLogs.add('📥 APK ready for download');
-        _step = 2;
-      });
+        _showBuildError(connectionError);
+        return;
+      }
+
+      // Backend is running - proceed with build
+      _buildLogs.add('✅ Backend is ready');
+      _updateLogs();
+
+      // Retry loop only for actual build failures, not connection errors
+      const maxBuildRetries = 3;
+
+      for (
+        int buildAttempt = 1;
+        buildAttempt <= maxBuildRetries;
+        buildAttempt++
+      ) {
+        try {
+          if (buildAttempt > 1) {
+            _buildLogs.add(
+              '🔄 Retry attempt $buildAttempt/$maxBuildRetries...',
+            );
+            _updateLogs();
+          }
+
+          // Step 2: Submit build request to backend
+          _buildLogs.add('📤 Submitting build request...');
+          _updateLogs();
+
+          final buildId = await BuildService.startApkBuild(
+            _project!,
+            onStatusUpdate: (status) {
+              _buildLogs.add(status);
+              _updateLogs();
+            },
+          );
+
+          if (!mounted) return;
+
+          _buildLogs.add('✅ Build queued (ID: $buildId)');
+          _buildLogs.add('⏳ Waiting for build to complete...');
+          _updateLogs();
+
+          // Step 3: Poll for build status
+          final downloadUrl = await BuildService.pollBuildStatus(
+            buildId,
+            _updateProgress,
+            (log) {
+              _buildLogs.add(log);
+              _updateLogs();
+            },
+          );
+
+          if (!mounted) return;
+
+          _buildLogs.add('✅ Build completed successfully!');
+          _buildLogs.add('📥 APK is ready for download');
+          _updateLogs();
+
+          // Step 4: Build complete - store download URL for manual download
+          setState(() {
+            _downloadUrl = downloadUrl;
+            _buildLogs.add('✅ Click "Download APK" button to download');
+          });
+          _updateLogs();
+
+          // Transition to success view after a brief delay
+          Future.delayed(const Duration(seconds: 2)).then((_) {
+            if (mounted) {
+              setState(() {
+                _step = 2;
+              });
+            }
+          });
+
+          return; // Build successful, exit retry loop
+        } catch (e) {
+          if (!mounted) return;
+
+          final errorMsg = e.toString();
+          _buildLogs.add('❌ Error: $errorMsg');
+
+          if (buildAttempt < maxBuildRetries) {
+            _buildLogs.add(
+              '🔄 Retrying build (attempt $buildAttempt/$maxBuildRetries)',
+            );
+            _buildLogs.add('⏳ Waiting before retry...');
+            _updateLogs();
+
+            // Wait before retrying (with backoff)
+            await Future.delayed(Duration(seconds: 3 * buildAttempt));
+          } else {
+            _buildLogs.add('❌ Build failed after $maxBuildRetries attempts');
+            _showBuildError(
+              'Build failed after $maxBuildRetries attempts:\n\n$errorMsg',
+            );
+            return;
+          }
+        }
+      }
     } catch (e) {
       if (!mounted) return;
-      _showBuildError(e.toString());
+      _showBuildError('Backend connection failed: ${e.toString()}');
+      return;
     }
   }
 
@@ -111,10 +404,6 @@ class _PublishScreenState extends State<PublishScreen> {
       _buildLogs.add('❌ Build failed: $error');
       _step = 1; // Stay on building step to show error
     });
-  }
-
-  void _addLog(String log) {
-    setState(() => _buildLogs.add(log));
   }
 
   @override
@@ -270,7 +559,7 @@ class _PublishScreenState extends State<PublishScreen> {
       SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: _startBuild,
+          onPressed: _showBuildDialog,
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
@@ -279,7 +568,7 @@ class _PublishScreenState extends State<PublishScreen> {
           ),
           icon: const Text('🚀', style: TextStyle(fontSize: 20)),
           label: const Text(
-            'Build & Publish App',
+            'Publish App',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ),
@@ -576,25 +865,9 @@ class _PublishScreenState extends State<PublishScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _isDownloading ? null : () => _launchDownload(),
-                icon: _isDownloading
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          value: _downloadProgress,
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white.withOpacity(0.7),
-                          ),
-                        ),
-                      )
-                    : const Icon(Icons.download, size: 18),
-                label: _isDownloading
-                    ? Text(
-                        'Downloading ${(_downloadProgress * 100).toStringAsFixed(0)}%',
-                      )
-                    : const Text('Download'),
+                onPressed: () => _downloadApk(),
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text('Download APK'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary.withOpacity(0.8),
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -633,40 +906,18 @@ class _PublishScreenState extends State<PublishScreen> {
     }
   }
 
-  Future<void> _launchDownload() async {
+  Future<void> _downloadApk() async {
     if (_downloadUrl == null || _downloadUrl!.isEmpty) {
       _showError('No download URL available');
       return;
     }
 
-    await ApkDownloadService.downloadApk(
-      downloadUrl: _downloadUrl!,
-      onProgress: (progress) {
-        setState(() {
-          _downloadProgress = progress;
-          _isDownloading = progress < 1.0;
-        });
-      },
-      onSuccess: (filePath) {
-        setState(() {
-          _isDownloading = false;
-          _downloadProgress = 1.0;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'APK downloaded and ready for installation: $filePath',
-            ),
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      },
-      onError: (error) {
-        setState(() {
-          _isDownloading = false;
-        });
-        _showError('Download failed: $error');
-      },
-    );
+    try {
+      // Use BuildService to download APK in web browser
+      BuildService.downloadApkWeb(_downloadUrl!);
+      _showError('✅ APK download started in your browser!');
+    } catch (e) {
+      _showError('Failed to download APK: $e');
+    }
   }
 }

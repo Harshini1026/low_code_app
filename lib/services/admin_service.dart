@@ -1,12 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AdminService — all Firestore reads/writes for the admin dashboard
 // ══════════════════════════════════════════════════════════════════════════════
 class AdminService {
-  final _db   = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
 
   // ── Role check ─────────────────────────────────────────────────────────────
   /// Returns true if the current uid has role == 'admin' in Firestore users collection
@@ -21,8 +19,8 @@ class AdminService {
 
   // ── Analytics ──────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getAnalytics() async {
-    final usersSnap   = await _db.collection('users').get();
-    final appsSnap    = await _db.collection('projects').get();
+    final usersSnap = await _db.collection('users').get();
+    final appsSnap = await _db.collection('projects').get();
     final publishedSnap = await _db
         .collection('projects')
         .where('status', isEqualTo: 'published')
@@ -30,7 +28,8 @@ class AdminService {
 
     // Active users = logged in within last 7 days
     final cutoff = Timestamp.fromDate(
-        DateTime.now().subtract(const Duration(days: 7)));
+      DateTime.now().subtract(const Duration(days: 7)),
+    );
     final activeSnap = await _db
         .collection('users')
         .where('lastSeen', isGreaterThan: cutoff)
@@ -42,11 +41,11 @@ class AdminService {
         .get();
 
     return {
-      'totalUsers':     usersSnap.size,
-      'totalApps':      appsSnap.size,
-      'publishedApps':  publishedSnap.size,
-      'activeUsers':    activeSnap.size,
-      'adminCount':     adminSnap.size,
+      'totalUsers': usersSnap.size,
+      'totalApps': appsSnap.size,
+      'publishedApps': publishedSnap.size,
+      'activeUsers': activeSnap.size,
+      'adminCount': adminSnap.size,
     };
   }
 
@@ -56,9 +55,7 @@ class AdminService {
         .collection('users')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => {'id': d.id, ...d.data()})
-            .toList());
+        .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   Future<void> deleteUser(String uid) =>
@@ -73,9 +70,7 @@ class AdminService {
         .collection('projects')
         .orderBy('updatedAt', descending: true)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => {'id': d.id, ...d.data()})
-            .toList());
+        .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   Future<void> approveApp(String appId) =>
@@ -93,16 +88,12 @@ class AdminService {
         .collection('templates')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => {'id': d.id, ...d.data()})
-            .toList());
+        .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
-  Future<void> createTemplate(Map<String, dynamic> data) =>
-      _db.collection('templates').add({
-        ...data,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> createTemplate(Map<String, dynamic> data) => _db
+      .collection('templates')
+      .add({...data, 'createdAt': FieldValue.serverTimestamp()});
 
   Future<void> updateTemplate(String id, Map<String, dynamic> data) =>
       _db.collection('templates').doc(id).update(data);
@@ -116,16 +107,12 @@ class AdminService {
         .collection('components')
         .orderBy('name')
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => {'id': d.id, ...d.data()})
-            .toList());
+        .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
-  Future<void> createComponent(Map<String, dynamic> data) =>
-      _db.collection('components').add({
-        ...data,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> createComponent(Map<String, dynamic> data) => _db
+      .collection('components')
+      .add({...data, 'createdAt': FieldValue.serverTimestamp()});
 
   Future<void> updateComponent(String id, Map<String, dynamic> data) =>
       _db.collection('components').doc(id).update(data);
@@ -139,9 +126,7 @@ class AdminService {
         .collection('deployments')
         .orderBy('deployedAt', descending: true)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => {'id': d.id, ...d.data()})
-            .toList());
+        .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   Future<void> updateDeploymentStatus(String id, String status) =>
@@ -154,9 +139,7 @@ class AdminService {
         .orderBy('timestamp', descending: true)
         .limit(100)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => {'id': d.id, ...d.data()})
-            .toList());
+        .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
   }
 
   Future<void> deleteAiLog(String id) =>
