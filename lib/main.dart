@@ -54,7 +54,7 @@ void main() async {
   );
 
   // ✅ Initialize NetworkConfig - detects system IP for backend connection
-  await NetworkConfig.initialize();
+  await NetworkConfig.getBackendBaseUrl();
 
   runApp(const AppForgeApp());
 }

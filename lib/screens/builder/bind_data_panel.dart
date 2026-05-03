@@ -4,6 +4,9 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/builder_provider.dart';
 import '../../models/widget_model.dart';
 import '../../models/project_model.dart';
+import '../../models/screen_model.dart';
+import '../../services/auto_backend_detector.dart';
+import '../../widgets/quick_field_dialog.dart';
 
 class BindDataPanel extends StatefulWidget {
   final BuilderProvider provider;
@@ -62,11 +65,52 @@ class _BindDataPanelState extends State<BindDataPanel> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill if already bound
-    if (widget.widget.boundTable?.isNotEmpty == true) {
-      _table = widget.widget.boundTable;
-      _field = widget.widget.boundField;
+    // Pre-fill only if bound values still exist in the current schema.
+    // Without this check, DropdownButtonFormField asserts when the saved
+    // table/field was renamed or deleted after the binding was created.
+    final savedTable = widget.widget.boundTable ?? '';
+    if (savedTable.isNotEmpty) {
+      final tableExists = _tables.any((t) => t.name == savedTable);
+      if (tableExists) {
+        _table = savedTable;
+        final savedField = widget.widget.boundField ?? '';
+        if (savedField.isNotEmpty && _fields.contains(savedField)) {
+          _field = savedField;
+        }
+      }
     }
+  }
+
+  /// Quick create field using auto-detection
+  void _showQuickCreateDialog() {
+    final fieldName = AutoBackendDetector.suggestFieldName(widget.widget);
+    final fieldType = AutoBackendDetector.detectFieldType(widget.widget);
+    final tableName = AutoBackendDetector.suggestTableName(
+      widget.provider.activeScreen ??
+          AppScreen(id: '', name: 'Screen', widgets: []),
+    );
+
+    QuickFieldDialog.show(
+      context,
+      provider: widget.provider,
+      suggestedFieldName: fieldName,
+      suggestedFieldType: fieldType,
+      suggestedTableName: tableName,
+    ).then((created) {
+      if (created == true) {
+        // Refresh table/field lists
+        setState(() {
+          _table = tableName;
+          _field = fieldName;
+        });
+        // Auto-bind if field creation was successful
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && _canBind) {
+            _bind();
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -251,11 +295,11 @@ class _BindDataPanelState extends State<BindDataPanel> {
                           color: AppTheme.accent.withOpacity(0.3),
                         ),
                       ),
-                      child: const Column(
+                      child: Column(
                         children: [
-                          Text('⚠️', style: TextStyle(fontSize: 32)),
-                          SizedBox(height: 8),
-                          Text(
+                          const Text('⚠️', style: TextStyle(fontSize: 32)),
+                          const SizedBox(height: 8),
+                          const Text(
                             'No database tables yet',
                             style: TextStyle(
                               color: AppTheme.textPrimary,
@@ -263,14 +307,33 @@ class _BindDataPanelState extends State<BindDataPanel> {
                               fontSize: 14,
                             ),
                           ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Go to the Backend tab and create a\nFirestore collection first.',
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Create a field instantly or use an existing table.',
                             style: TextStyle(
                               color: AppTheme.textMuted,
                               fontSize: 12,
                             ),
                             textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          // Quick create button for when no tables exist
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _showQuickCreateDialog,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                              ),
+                              icon: const Icon(Icons.flash_on, size: 16),
+                              label: const Text(
+                                'Quick Create Field',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -482,6 +545,22 @@ class _BindDataPanelState extends State<BindDataPanel> {
             ),
             child: Row(
               children: [
+                // Quick create button (only when tables exist)
+                if (_tables.isNotEmpty)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showQuickCreateDialog,
+                      icon: const Icon(Icons.flash_on, size: 16),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      label: const Text('Quick Create'),
+                    ),
+                  ),
+                if (_tables.isNotEmpty) const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),

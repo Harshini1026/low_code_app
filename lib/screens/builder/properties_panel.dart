@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/project_model.dart';
 import '../../models/widget_model.dart';
 import '../../providers/builder_provider.dart';
 import 'child_management_panel.dart';
@@ -204,8 +205,65 @@ class PropertiesPanel extends StatelessWidget {
           'On Tap',
           'action',
           type: 'select',
-          options: ['none', 'navigate', 'submit', 'open_url'],
+          options: ['none', 'navigate', 'submit', 'open_url', 'addRecord'],
         );
+        if (widget.properties['action'] == 'addRecord') {
+          final tables = provider.project?.backendConfig.tables ?? [];
+          if (tables.isEmpty) {
+            fields.add(
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.accent.withOpacity(0.3)),
+                ),
+                child: const Text(
+                  '⚠️ No tables yet. Create one in the Backend panel first.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                ),
+              ),
+            );
+            fields.add(const SizedBox(height: 12));
+          } else {
+            final tableNames = tables.map((t) => t.name).toList();
+            add(
+              'Target Table',
+              'actionTable',
+              type: 'select',
+              options: tableNames,
+            );
+            final selectedName =
+                widget.properties['actionTable']?.toString() ??
+                tableNames.first;
+            final DatabaseTable selectedTable = tables.firstWhere(
+              (t) => t.name == selectedName,
+              orElse: () => tables.first,
+            );
+            final fieldOptions = selectedTable.fields
+                .where(
+                  (f) => !['id', 'created_at', 'updated_at'].contains(f),
+                )
+                .toList();
+            if (fieldOptions.isNotEmpty) {
+              final selectedFields =
+                  (widget.properties['actionFields']?.toString() ?? '')
+                      .split(',')
+                      .map((f) => f.trim())
+                      .where((f) => f.isNotEmpty)
+                      .toSet();
+              fields.add(
+                _FieldChipSelector(
+                  allFields: fieldOptions,
+                  selectedFields: selectedFields,
+                  onChanged: (updated) =>
+                      onPropertyChanged('actionFields', updated.join(',')),
+                ),
+              );
+              fields.add(const SizedBox(height: 12));
+            }
+          }
+        }
         break;
       case 'text':
         add('Content', 'content');
@@ -541,6 +599,19 @@ class PropertiesPanel extends StatelessWidget {
         add('Padding', 'padding', type: 'slider', min: 0, max: 24);
         break;
       case 'listview':
+        // Source table binding — sets boundTable so the installed app streams
+        // records from Firestore for that collection automatically.
+        final lvTables = provider.project?.backendConfig.tables ?? [];
+        fields.add(
+          _SourceTableRow(
+            currentTable: widget.boundTable ?? '',
+            tables: lvTables,
+            onChanged: (tableName) =>
+                provider.bindWidgetToData(widget.id, tableName, ''),
+            onClear: () => provider.bindWidgetToData(widget.id, '', ''),
+          ),
+        );
+        fields.add(const SizedBox(height: 12));
         add('Items (comma sep)', 'items');
         add(
           'Scroll Direction',
@@ -576,6 +647,157 @@ class PropertiesPanel extends StatelessWidget {
         fields.add(const SizedBox(height: 16));
         fields.add(ChildManagementPanel(widget: widget, provider: provider));
         break;
+      case 'iconbtn':
+        fields.add(
+          _IconPickerRow(
+            label: 'ICON',
+            value: widget.properties['icon']?.toString() ?? 'favorite',
+            onChanged: (v) => onPropertyChanged('icon', v),
+          ),
+        );
+        fields.add(const SizedBox(height: 12));
+        add('Background Color', 'color', type: 'color');
+        add('Icon Color', 'iconColor', type: 'color');
+        add(
+          'On Tap',
+          'action',
+          type: 'select',
+          options: ['none', 'navigate', 'submit', 'open_url', 'addRecord'],
+        );
+        if (widget.properties['action'] == 'addRecord') {
+          final tables = provider.project?.backendConfig.tables ?? [];
+          if (tables.isEmpty) {
+            fields.add(
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.accent.withOpacity(0.3)),
+                ),
+                child: const Text(
+                  '⚠️ No tables yet. Create one in the Backend panel first.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                ),
+              ),
+            );
+            fields.add(const SizedBox(height: 12));
+          } else {
+            final tableNames = tables.map((t) => t.name).toList();
+            add(
+              'Target Table',
+              'actionTable',
+              type: 'select',
+              options: tableNames,
+            );
+            final selectedName =
+                widget.properties['actionTable']?.toString() ??
+                tableNames.first;
+            final DatabaseTable selectedTable = tables.firstWhere(
+              (t) => t.name == selectedName,
+              orElse: () => tables.first,
+            );
+            final fieldOptions = selectedTable.fields
+                .where(
+                  (f) => !['id', 'created_at', 'updated_at'].contains(f),
+                )
+                .toList();
+            if (fieldOptions.isNotEmpty) {
+              final selectedFields =
+                  (widget.properties['actionFields']?.toString() ?? '')
+                      .split(',')
+                      .map((f) => f.trim())
+                      .where((f) => f.isNotEmpty)
+                      .toSet();
+              fields.add(
+                _FieldChipSelector(
+                  allFields: fieldOptions,
+                  selectedFields: selectedFields,
+                  onChanged: (updated) =>
+                      onPropertyChanged('actionFields', updated.join(',')),
+                ),
+              );
+              fields.add(const SizedBox(height: 12));
+            }
+          }
+        }
+        break;
+
+      case 'fab':
+        fields.add(
+          _IconPickerRow(
+            label: 'ICON',
+            value: widget.properties['icon']?.toString() ?? 'add',
+            onChanged: (v) => onPropertyChanged('icon', v),
+          ),
+        );
+        fields.add(const SizedBox(height: 12));
+        add('Background Color', 'color', type: 'color');
+        add(
+          'On Tap',
+          'action',
+          type: 'select',
+          options: ['none', 'navigate', 'submit', 'open_url', 'addRecord'],
+        );
+        if (widget.properties['action'] == 'addRecord') {
+          final tables = provider.project?.backendConfig.tables ?? [];
+          if (tables.isEmpty) {
+            fields.add(
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.accent.withOpacity(0.3)),
+                ),
+                child: const Text(
+                  '⚠️ No tables yet. Create one in the Backend panel first.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                ),
+              ),
+            );
+            fields.add(const SizedBox(height: 12));
+          } else {
+            final tableNames = tables.map((t) => t.name).toList();
+            add(
+              'Target Table',
+              'actionTable',
+              type: 'select',
+              options: tableNames,
+            );
+            final selectedName =
+                widget.properties['actionTable']?.toString() ??
+                tableNames.first;
+            final DatabaseTable selectedTable = tables.firstWhere(
+              (t) => t.name == selectedName,
+              orElse: () => tables.first,
+            );
+            final fieldOptions = selectedTable.fields
+                .where(
+                  (f) => !['id', 'created_at', 'updated_at'].contains(f),
+                )
+                .toList();
+            if (fieldOptions.isNotEmpty) {
+              final selectedFields =
+                  (widget.properties['actionFields']?.toString() ?? '')
+                      .split(',')
+                      .map((f) => f.trim())
+                      .where((f) => f.isNotEmpty)
+                      .toSet();
+              fields.add(
+                _FieldChipSelector(
+                  allFields: fieldOptions,
+                  selectedFields: selectedFields,
+                  onChanged: (updated) =>
+                      onPropertyChanged('actionFields', updated.join(',')),
+                ),
+              );
+              fields.add(const SizedBox(height: 12));
+            }
+          }
+        }
+        break;
+
       default:
         add('Label', 'label');
         add('Color', 'color', type: 'color');
@@ -843,14 +1065,25 @@ class _PropRow extends StatelessWidget {
         );
 
       case 'select':
-        final String v = value?.toString() ?? (options?.first ?? '');
-        final String? safeVal = options?.contains(v) == true
+        final String v = value?.toString() ?? '';
+        final List<String> allOpts = options ?? [];
+        final bool isValid = allOpts.contains(v);
+        final String safeVal = isValid
             ? v
-            : options?.first;
+            : (allOpts.isNotEmpty ? allOpts.first : v);
+
+        // When the stored value is missing/invalid, the dropdown auto-corrects
+        // to the first option visually — but never saves it. Schedule a write
+        // so the persisted value matches what the user actually sees.
+        if (!isValid && allOpts.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => onChanged(safeVal),
+          );
+        }
+
         return DropdownButtonFormField<String>(
-          value: safeVal,
-          items: (options ?? []).map((o) {
-            // Extract clean display name from stored value (e.g., "name:id" -> "name")
+          value: safeVal.isEmpty ? null : safeVal,
+          items: allOpts.map((o) {
             final displayText = o.contains(':') ? o.split(':').first.trim() : o;
             return DropdownMenuItem(
               value: o,
@@ -862,8 +1095,8 @@ class _PropRow extends StatelessWidget {
               ),
             );
           }).toList(),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
+          onChanged: (val) {
+            if (val != null) onChanged(val);
           },
           dropdownColor: AppTheme.darkCard,
           style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12),
@@ -1632,6 +1865,322 @@ class _BottomNavConfigPanelState extends State<_BottomNavConfigPanel> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Source table selector for listview ───────────────────────────────────────
+class _SourceTableRow extends StatelessWidget {
+  final String currentTable;
+  final List<DatabaseTable> tables;
+  final void Function(String tableName) onChanged;
+  final VoidCallback onClear;
+
+  const _SourceTableRow({
+    required this.currentTable,
+    required this.tables,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'SOURCE TABLE',
+        style: TextStyle(
+          color: AppTheme.textMuted,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+      const SizedBox(height: 5),
+      if (tables.isEmpty)
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppTheme.accent.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.accent.withOpacity(0.3)),
+          ),
+          child: const Text(
+            'No tables yet — create one in the Backend panel',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+          ),
+        )
+      else
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: currentTable.isEmpty ? null : currentTable,
+                hint: const Text(
+                  'None (use static items)',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
+                dropdownColor: AppTheme.darkCard,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 12,
+                ),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                ),
+                items: tables.map((t) {
+                  return DropdownMenuItem(
+                    value: t.name,
+                    child: Text(t.name),
+                  );
+                }).toList(),
+                onChanged: (v) {
+                  if (v != null) onChanged(v);
+                },
+              ),
+            ),
+            if (currentTable.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.close, size: 16, color: AppTheme.accent),
+                onPressed: onClear,
+                tooltip: 'Remove binding',
+              ),
+          ],
+        ),
+      if (currentTable.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Row(
+            children: [
+              const Icon(Icons.link, size: 12, color: AppTheme.secondary),
+              const SizedBox(width: 4),
+              Text(
+                'Will show records from "$currentTable" in installed app',
+                style: const TextStyle(
+                  color: AppTheme.secondary,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+}
+
+// ── Field chip selector for addRecord button config ───────────────────────────
+class _FieldChipSelector extends StatelessWidget {
+  final List<String> allFields;
+  final Set<String> selectedFields;
+  final void Function(List<String>) onChanged;
+
+  const _FieldChipSelector({
+    required this.allFields,
+    required this.selectedFields,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'FIELDS TO COLLECT',
+        style: TextStyle(
+          color: AppTheme.textMuted,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: allFields.map((f) {
+          final isSelected = selectedFields.contains(f);
+          return GestureDetector(
+            onTap: () {
+              final updated = Set<String>.from(selectedFields);
+              if (isSelected) {
+                updated.remove(f);
+              } else {
+                updated.add(f);
+              }
+              onChanged(updated.toList());
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppTheme.primary.withOpacity(0.15)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: isSelected ? AppTheme.primary : AppTheme.darkBorder,
+                ),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                f,
+                style: TextStyle(
+                  color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: isSelected
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    ],
+  );
+}
+
+// ── Icon picker: text input + quick-pick chips ────────────────────────────────
+class _IconPickerRow extends StatefulWidget {
+  final String label;
+  final String value;
+  final void Function(String) onChanged;
+
+  const _IconPickerRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  State<_IconPickerRow> createState() => _IconPickerRowState();
+}
+
+class _IconPickerRowState extends State<_IconPickerRow> {
+  static const _icons = [
+    ('favorite', Icons.favorite),
+    ('add', Icons.add),
+    ('home', Icons.home),
+    ('search', Icons.search),
+    ('settings', Icons.settings),
+    ('person', Icons.person),
+    ('edit', Icons.edit),
+    ('delete', Icons.delete),
+    ('share', Icons.share),
+    ('notifications', Icons.notifications),
+    ('email', Icons.email),
+    ('phone', Icons.phone),
+    ('location_on', Icons.location_on),
+    ('calendar_today', Icons.calendar_today),
+    ('check', Icons.check),
+    ('close', Icons.close),
+    ('arrow_back', Icons.arrow_back),
+    ('arrow_forward', Icons.arrow_forward),
+    ('send', Icons.send),
+    ('download', Icons.download),
+    ('upload', Icons.upload),
+    ('camera_alt', Icons.camera_alt),
+    ('lock', Icons.lock),
+    ('star', Icons.star),
+    ('info', Icons.info),
+    ('refresh', Icons.refresh),
+    ('thumb_up', Icons.thumb_up),
+    ('menu', Icons.menu),
+    ('more_vert', Icons.more_vert),
+    ('check_circle', Icons.check_circle),
+  ];
+
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(_IconPickerRow old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value && _ctrl.text != widget.value) {
+      _ctrl.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = widget.value.toLowerCase();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: const TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 5),
+        TextFormField(
+          controller: _ctrl,
+          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12),
+          decoration: const InputDecoration(
+            hintText: 'e.g. favorite, add, home…',
+            hintStyle: TextStyle(fontSize: 11),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          ),
+          onChanged: (v) => widget.onChanged(v.trim().toLowerCase()),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _icons.length,
+            separatorBuilder: (_, _i) => const SizedBox(width: 4),
+            itemBuilder: (context, i) {
+              final (name, iconData) = _icons[i];
+              final selected = current == name;
+              return GestureDetector(
+                onTap: () {
+                  widget.onChanged(name);
+                  _ctrl.text = name;
+                },
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppTheme.primary.withOpacity(0.2)
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: selected
+                          ? AppTheme.primary
+                          : AppTheme.darkBorder,
+                    ),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    iconData,
+                    size: 16,
+                    color: selected ? AppTheme.primary : AppTheme.textMuted,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

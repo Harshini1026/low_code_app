@@ -73,3 +73,17 @@ linux/flutter/generated_*
 macos/Flutter/GeneratedPluginRegistrant.swift
 windows/flutter/generated_*
 windows/runner/resources/app_icon.ico
+
+# Claude Code memory / session files
+.claude/
+
+# Auto-generated project doc files (created by AI assistant)
+ARCHITECTURE_DIAGRAMS.md
+IMPLEMENTATION_CHECKLIST.md
+IMPLEMENTATION_SUMMARY.md
+QUICK_REFERENCE_CARD.md
+SMART_BACKEND_GENERATION_GUIDE.md
+
+# Backend build outputs — APKs and temp build dirs are large and regenerable
+backend/apks/
+backend/builds/

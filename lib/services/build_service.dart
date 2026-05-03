@@ -70,38 +70,53 @@ class BuildService {
 
   /// Generate a simple error message when backend is not reachable
   static String _buildBackendNotRunningError() {
-    return 'Please start the backend server.\n\nOpen a terminal and run:\ncd backend\nnpm install\nnpm start\n\nThen click Build again.';
+    final url = _baseUrl;
+    return 'Backend server is not running.\n\nExpected at: $url\n\nTo start it:\n1. Open a terminal\n2. cd backend\n3. node build-server.js\n\nKeep that terminal open, then click Build again.';
   }
 
-  /// Export project configuration as JSON for building
+  /// Export full project configuration as JSON for the build server.
+  /// Includes boundTable/boundField so the code generator can wire up
+  /// Firestore reads (listview) and writes (button addRecord) in the APK.
   static Map<String, dynamic> exportProjectConfig(ProjectModel project) {
     return {
       'id': project.id,
       'name': project.name,
       'createdAt': project.createdAt.toIso8601String(),
+      'theme': project.theme.toMap(),
+      'backendConfig': {
+        'tables': project.backendConfig.tables
+            .map((t) => t.toMap())
+            .toList(),
+        'emailAuth': project.backendConfig.emailAuth,
+        'googleAuth': project.backendConfig.googleAuth,
+        'phoneAuth': project.backendConfig.phoneAuth,
+      },
       'screens': project.screens
           .map(
             (screen) => {
               'id': screen.id,
               'name': screen.name,
               'widgets': screen.widgets
-                  .map(
-                    (widget) => {
-                      'id': widget.id,
-                      'type': widget.type,
-                      'x': widget.x,
-                      'y': widget.y,
-                      'width': widget.width,
-                      'height': widget.height,
-                      'properties': widget.properties,
-                    },
-                  )
+                  .map((w) => _exportWidget(w))
                   .toList(),
             },
           )
           .toList(),
     };
   }
+
+  static Map<String, dynamic> _exportWidget(dynamic w) => {
+    'id': w.id,
+    'type': w.type,
+    'x': w.x,
+    'y': w.y,
+    'width': w.width,
+    'height': w.height,
+    'properties': w.properties,
+    'boundTable': w.boundTable,   // which table this widget reads from
+    'boundField': w.boundField,   // which field (for single-field widgets)
+    'children': (w.children as List).map((c) => _exportWidget(c)).toList(),
+  };
 
   /// Start APK build on backend (non-blocking, returns immediately)
   /// Returns buildId for tracking

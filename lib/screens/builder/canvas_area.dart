@@ -5,6 +5,7 @@ import '../../models/screen_model.dart';
 import '../../models/widget_model.dart';
 import '../../models/project_model.dart';
 import '../../providers/builder_provider.dart';
+import '../../services/firestore_service.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CanvasArea
@@ -452,6 +453,194 @@ class WidgetRenderer extends StatelessWidget {
     return TextAlign.left;
   }
 
+  Map<String, IconData> _widgetIconMap() => {
+    'star': Icons.star,
+    'heart': Icons.favorite,
+    'favorite': Icons.favorite,
+    'home': Icons.home,
+    'search': Icons.search,
+    'settings': Icons.settings,
+    'user': Icons.person,
+    'person': Icons.person,
+    'menu': Icons.menu,
+    'close': Icons.close,
+    'add': Icons.add,
+    'delete': Icons.delete,
+    'edit': Icons.edit,
+    'share': Icons.share,
+    'like': Icons.thumb_up,
+    'thumb_up': Icons.thumb_up,
+    'notifications': Icons.notifications,
+    'email': Icons.email,
+    'phone': Icons.phone,
+    'location': Icons.location_on,
+    'location_on': Icons.location_on,
+    'calendar': Icons.calendar_today,
+    'calendar_today': Icons.calendar_today,
+    'clock': Icons.access_time,
+    'access_time': Icons.access_time,
+    'arrow_back': Icons.arrow_back,
+    'arrow_forward': Icons.arrow_forward,
+    'check': Icons.check,
+    'check_circle': Icons.check_circle,
+    'info': Icons.info,
+    'warning': Icons.warning,
+    'error': Icons.error,
+    'lock': Icons.lock,
+    'visibility': Icons.visibility,
+    'camera': Icons.camera_alt,
+    'camera_alt': Icons.camera_alt,
+    'photo': Icons.photo,
+    'download': Icons.download,
+    'upload': Icons.upload,
+    'refresh': Icons.refresh,
+    'send': Icons.send,
+    'more_vert': Icons.more_vert,
+    'more_horiz': Icons.more_horiz,
+  };
+
+  static void _showAddRecordDialog(
+    BuildContext context, {
+    required String projectId,
+    required String tableName,
+    required List<String> fields,
+    required Color primaryColor,
+  }) {
+    if (projectId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Project not loaded. Try again.')),
+      );
+      return;
+    }
+    if (tableName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No table selected. Open Properties and set Target Table.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (fields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No fields selected. Open Properties and pick fields to collect.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final controllers = {for (final f in fields) f: TextEditingController()};
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.add_circle_outline, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Add to $tableName',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: fields
+                    .map(
+                      (f) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: TextField(
+                          controller: controllers[f],
+                          decoration: InputDecoration(
+                            labelText: f,
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setDialogState(() => saving = true);
+                      final data = <String, dynamic>{
+                        for (final f in fields)
+                          f: controllers[f]!.text.trim(),
+                      };
+                      try {
+                        await FirestoreService().addRecord(
+                          projectId,
+                          tableName,
+                          data,
+                        );
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Record added to "$tableName" ✓',
+                              ),
+                              backgroundColor: primaryColor,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          setDialogState(() => saving = false);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Save',
+                      style: TextStyle(color: Colors.white),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    ).then((_) {
+      for (final c in controllers.values) {
+        c.dispose();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final props = widgetModel.properties;
@@ -467,9 +656,23 @@ class WidgetRenderer extends StatelessWidget {
           child: ElevatedButton(
             onPressed: () {
               final action = _s(props, 'action', 'none');
-              if (action != 'none') {
+              if (action == 'addRecord') {
+                final tableName = _s(props, 'actionTable', '').trim();
+                final fields = _s(props, 'actionFields', '')
+                    .split(',')
+                    .map((f) => f.trim())
+                    .where((f) => f.isNotEmpty)
+                    .toList();
+                _showAddRecordDialog(
+                  context,
+                  projectId: provider?.project?.id ?? '',
+                  tableName: tableName,
+                  fields: fields,
+                  primaryColor: _themePrimary,
+                );
+              } else if (action != 'none') {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Button action: $action')),
+                  SnackBar(content: Text('Action: $action')),
                 );
               }
             },
@@ -1862,30 +2065,81 @@ class WidgetRenderer extends StatelessWidget {
 
       // ── Icon Button ────────────────────────────────────────────────────────
       case 'iconbtn':
+        final _iconBtnMap = _widgetIconMap();
+        final _iconBtnIcon = _iconBtnMap[
+              _s(props, 'icon', 'favorite').toLowerCase()
+            ] ??
+            Icons.favorite;
         return SizedBox(
           width: w,
           height: h,
           child: Center(
             child: IconButton(
-              icon: Icon(
-                Icons.favorite,
-                color: _c(props, 'color', AppTheme.primary),
+              style: IconButton.styleFrom(
+                backgroundColor: _c(props, 'color', AppTheme.primary),
               ),
-              onPressed: () {},
+              icon: Icon(
+                _iconBtnIcon,
+                color: _c(props, 'iconColor', Colors.white),
+              ),
+              onPressed: () {
+                final action = _s(props, 'action', 'none');
+                if (action == 'addRecord') {
+                  _showAddRecordDialog(
+                    context,
+                    projectId: provider?.project?.id ?? '',
+                    tableName: _s(props, 'actionTable', '').trim(),
+                    fields: _s(props, 'actionFields', '')
+                        .split(',')
+                        .map((f) => f.trim())
+                        .where((f) => f.isNotEmpty)
+                        .toList(),
+                    primaryColor: _themePrimary,
+                  );
+                } else if (action != 'none') {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Action: $action')),
+                  );
+                }
+              },
             ),
           ),
         );
 
       // ── FAB ────────────────────────────────────────────────────────────────
       case 'fab':
+        final _fabIconMap = _widgetIconMap();
+        final _fabIcon = _fabIconMap[
+              _s(props, 'icon', 'add').toLowerCase()
+            ] ??
+            Icons.add;
         return SizedBox(
           width: w,
           height: h,
           child: Center(
             child: FloatingActionButton(
               backgroundColor: _c(props, 'color', AppTheme.primary),
-              child: const Icon(Icons.add, color: Colors.white),
-              onPressed: () {},
+              child: Icon(_fabIcon, color: Colors.white),
+              onPressed: () {
+                final action = _s(props, 'action', 'none');
+                if (action == 'addRecord') {
+                  _showAddRecordDialog(
+                    context,
+                    projectId: provider?.project?.id ?? '',
+                    tableName: _s(props, 'actionTable', '').trim(),
+                    fields: _s(props, 'actionFields', '')
+                        .split(',')
+                        .map((f) => f.trim())
+                        .where((f) => f.isNotEmpty)
+                        .toList(),
+                    primaryColor: _themePrimary,
+                  );
+                } else if (action != 'none') {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Action: $action')),
+                  );
+                }
+              },
             ),
           ),
         );

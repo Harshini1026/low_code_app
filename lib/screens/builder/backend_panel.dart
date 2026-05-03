@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/builder_provider.dart';
 import '../../models/project_model.dart';
+import '../../models/backend_template_model.dart';
+import '../../services/auto_backend_detector.dart';
 
 class BackendPanel extends StatefulWidget {
   final BuilderProvider provider;
@@ -13,6 +15,10 @@ class BackendPanel extends StatefulWidget {
 
 class _BackendPanelState extends State<BackendPanel> {
   bool _addingTable = false;
+  bool _selectingTemplate = false;
+  String _selectedCategory = 'All';
+  BackendTemplate? _selectedTemplate;
+  final Set<String> _selectedFields = {};
   final _nameCtrl = TextEditingController();
   final _fieldsCtrl = TextEditingController();
 
@@ -136,6 +142,241 @@ class _BackendPanelState extends State<BackendPanel> {
     setState(() {});
   }
 
+  // ── Template selection methods ────────────────────────────────────────────
+  void _selectTemplate(BackendTemplate template) {
+    setState(() {
+      _selectedTemplate = template;
+      _selectedFields.clear();
+      _selectedFields.addAll(template.defaultFields);
+    });
+  }
+
+  void _toggleField(String fieldName, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedFields.add(fieldName);
+      } else {
+        _selectedFields.remove(fieldName);
+      }
+    });
+  }
+
+  void _createTableFromTemplate() {
+    if (_selectedTemplate == null || _selectedFields.isEmpty) return;
+
+    final tableName = _selectedTemplate!.name;
+    final fields = _selectedFields.toList();
+
+    widget.provider.addTable(tableName, fields);
+
+    // Reset template selection
+    setState(() {
+      _selectedTemplate = null;
+      _selectedFields.clear();
+      _selectingTemplate = false;
+    });
+  }
+
+  void _cancelTemplateSelection() {
+    setState(() {
+      _selectedTemplate = null;
+      _selectedFields.clear();
+      _selectingTemplate = false;
+    });
+  }
+
+  // ── Generate backend from current screen ────────────────────────────────────
+  Future<void> _generateFromCurrentScreen() async {
+    if (widget.provider.activeScreen == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No active screen')));
+      return;
+    }
+
+    final suggestion = AutoBackendDetector.generateFromScreen(
+      widget.provider.activeScreen!,
+    );
+
+    if (suggestion.fields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No input fields found in current screen'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Show preview dialog
+    _showGeneratePreview(suggestion);
+  }
+
+  void _showGeneratePreview(SuggestedBackendStructure suggestion) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.darkCard,
+        title: const Text(
+          'Suggested Backend Structure',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Table name
+              Text(
+                'Table: ${suggestion.tableName}',
+                style: const TextStyle(
+                  color: AppTheme.secondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Fields list
+              const Text(
+                'Fields:',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: suggestion.fields.entries.map((e) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.primary.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Text(
+                      '${e.key} (${e.value})',
+                      style: const TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Sample JSON
+              const Text(
+                'Sample Data:',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A0E17),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.darkBorder),
+                ),
+                child: Text(
+                  _prettyJson(suggestion.toSampleJson()),
+                  style: const TextStyle(
+                    color: AppTheme.primary,
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // Create the table
+              widget.provider.addTable(
+                suggestion.tableName,
+                suggestion.getFieldNames(includeSystem: true),
+              );
+
+              // Auto-bind widgets if possible
+              for (final w in suggestion.inputWidgets) {
+                final fieldName = AutoBackendDetector.suggestFieldName(w);
+                if (fieldName.isNotEmpty) {
+                  widget.provider.bindWidgetToData(
+                    w.id,
+                    suggestion.tableName,
+                    fieldName,
+                  );
+                }
+              }
+
+              Navigator.pop(context);
+              setState(() {});
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '✅ Created "${suggestion.tableName}" table with ${suggestion.fields.length} fields',
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.secondary,
+            ),
+            child: const Text('Create Table & Bind'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _prettyJson(Map<String, dynamic> json) {
+    final buffer = StringBuffer('{\n');
+    final entries = json.entries.toList();
+    for (int i = 0; i < entries.length; i++) {
+      final e = entries[i];
+      buffer.write('  "${e.key}": ${_jsonValue(e.value)}');
+      if (i < entries.length - 1) buffer.write(',');
+      buffer.write('\n');
+    }
+    buffer.write('}');
+    return buffer.toString();
+  }
+
+  String _jsonValue(dynamic value) {
+    if (value is String) return '"$value"';
+    if (value is bool) return value ? 'true' : 'false';
+    if (value is num) return value.toString();
+    return 'null';
+  }
+
   @override
   Widget build(BuildContext context) {
     // Sync local auth booleans in case project reloads
@@ -160,6 +401,33 @@ class _BackendPanelState extends State<BackendPanel> {
         ...tables.map(
           (t) => _TableCard(table: t, onDelete: () => _deleteTable(t.id)),
         ),
+
+        // ── Quick generation from screen ───────────────────────────────────
+        _AutoGenerateButton(
+          onTap: _generateFromCurrentScreen,
+          label: 'Generate from Screen',
+        ),
+        const SizedBox(height: 8),
+
+        // ── Template Selection ─────────────────────────────────────────────
+        if (_selectingTemplate)
+          _TemplateSelectionWidget(
+            selectedCategory: _selectedCategory,
+            selectedTemplate: _selectedTemplate,
+            selectedFields: _selectedFields,
+            onCategoryChanged: (category) =>
+                setState(() => _selectedCategory = category),
+            onTemplateSelected: _selectTemplate,
+            onFieldToggled: _toggleField,
+            onCreate: _createTableFromTemplate,
+            onCancel: _cancelTemplateSelection,
+          )
+        else
+          _TemplateSelectionButton(
+            onTap: () => setState(() => _selectingTemplate = true),
+          ),
+
+        const SizedBox(height: 10),
 
         if (_addingTable)
           _AddTableForm(
@@ -511,6 +779,359 @@ class _AuthToggleRow extends StatelessWidget {
           onChanged: onChanged,
         ),
       ],
+    ),
+  );
+}
+
+class _TemplateSelectionButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _TemplateSelectionButton({required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.menu, color: AppTheme.secondary, size: 16),
+            SizedBox(width: 6),
+            Text(
+              'Use Template',
+              style: TextStyle(
+                color: AppTheme.secondary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _TemplateSelectionWidget extends StatefulWidget {
+  final String selectedCategory;
+  final BackendTemplate? selectedTemplate;
+  final Set<String> selectedFields;
+  final ValueChanged<String> onCategoryChanged;
+  final ValueChanged<BackendTemplate> onTemplateSelected;
+  final void Function(String, bool) onFieldToggled;
+  final VoidCallback onCreate;
+  final VoidCallback onCancel;
+
+  const _TemplateSelectionWidget({
+    required this.selectedCategory,
+    required this.selectedTemplate,
+    required this.selectedFields,
+    required this.onCategoryChanged,
+    required this.onTemplateSelected,
+    required this.onFieldToggled,
+    required this.onCreate,
+    required this.onCancel,
+  });
+
+  @override
+  State<_TemplateSelectionWidget> createState() =>
+      _TemplateSelectionWidgetState();
+}
+
+class _TemplateSelectionWidgetState extends State<_TemplateSelectionWidget> {
+  @override
+  Widget build(BuildContext context) {
+    final templates = BackendTemplates.getByCategory(widget.selectedCategory);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Choose Template',
+            style: TextStyle(
+              color: AppTheme.secondary,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Category selector
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: BackendTemplates.categories.map((category) {
+                final isSelected = category == widget.selectedCategory;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => widget.onCategoryChanged(category),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppTheme.secondary.withOpacity(0.2)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppTheme.secondary
+                              : AppTheme.darkBorder,
+                        ),
+                      ),
+                      child: Text(
+                        category,
+                        style: TextStyle(
+                          color: isSelected
+                              ? AppTheme.secondary
+                              : AppTheme.textMuted,
+                          fontSize: 11,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Template grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1.2,
+            ),
+            itemCount: templates.length,
+            itemBuilder: (context, index) {
+              final template = templates[index];
+              final isSelected = template == widget.selectedTemplate;
+
+              return GestureDetector(
+                onTap: () => widget.onTemplateSelected(template),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.secondary.withOpacity(0.1)
+                        : const Color(0xFF060F1A),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppTheme.secondary
+                          : AppTheme.darkBorder,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            template.emoji,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              template.name,
+                              style: TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        template.description,
+                        style: const TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 10,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+
+          if (widget.selectedTemplate != null) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Select Fields',
+              style: TextStyle(
+                color: AppTheme.secondary,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Field selection
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.selectedTemplate!.availableFields.map((field) {
+                final isSelected = widget.selectedFields.contains(field.name);
+                final isRequired = field.required;
+
+                return GestureDetector(
+                  onTap: isRequired
+                      ? null
+                      : () => widget.onFieldToggled(field.name, !isSelected),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppTheme.secondary.withOpacity(0.1)
+                          : const Color(0xFF060F1A),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppTheme.secondary
+                            : AppTheme.darkBorder,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isRequired)
+                          const Icon(
+                            Icons.lock,
+                            size: 12,
+                            color: AppTheme.accent,
+                          )
+                        else
+                          Icon(
+                            isSelected
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
+                            size: 12,
+                            color: isSelected
+                                ? AppTheme.secondary
+                                : AppTheme.textMuted,
+                          ),
+                        const SizedBox(width: 4),
+                        Text(
+                          field.name,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppTheme.secondary
+                                : AppTheme.textMuted,
+                            fontSize: 11,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: widget.selectedFields.isNotEmpty
+                        ? widget.onCreate
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      backgroundColor: AppTheme.secondary,
+                    ),
+                    child: Text(
+                      'Create ${widget.selectedTemplate!.name} Table',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: widget.onCancel,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 12,
+                    ),
+                  ),
+                  child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Auto-Generate Button ──────────────────────────────────────────────────────
+class _AutoGenerateButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final String label;
+  const _AutoGenerateButton({required this.onTap, required this.label});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.secondary.withOpacity(0.1),
+            AppTheme.secondary.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.secondary.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.bolt, color: AppTheme.secondary, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.secondary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

@@ -162,4 +162,39 @@ class FirestoreService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  // ── Runtime data: add a record to a project table ─────────────────────────
+  // Stored at: project_data/{projectId}/{tableName}/{autoId}
+  Future<void> addRecord(
+    String projectId,
+    String tableName,
+    Map<String, dynamic> data,
+  ) async {
+    await _db
+        .collection('project_data')
+        .doc(projectId)
+        .collection(tableName)
+        .add({
+          ...data,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+  }
+
+  // ── Runtime data: stream records from a project table ─────────────────────
+  Stream<List<Map<String, dynamic>>> streamRecords(
+    String projectId,
+    String tableName,
+  ) {
+    return _db
+        .collection('project_data')
+        .doc(projectId)
+        .collection(tableName)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => <String, dynamic>{...doc.data(), 'id': doc.id})
+              .toList(),
+        );
+  }
 }

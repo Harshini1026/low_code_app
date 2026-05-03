@@ -1,14 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════════
-// APK Build Server - Node.js/Express Backend (FIXED VERSION)
-// Generates Flutter projects dynamically and builds real APKs
-// 
-// FIXES APPLIED:
-// ✅ Normalized API endpoints (removed duplicates)
-// ✅ Unified status field: "pending" | "building" | "complete" | "failed"  
-// ✅ Fixed IP address extraction for download URLs
-// ✅ Improved error capture from Flutter build process
-// ✅ Better APK validation
+// APK Build Server - Node.js/Express Backend
+// Generates real Flutter projects from designer config and builds APKs
+// VERSION: 5
 // ════════════════════════════════════════════════════════════════════════════════
+const SERVER_VERSION = 6;
 
 const express = require('express');
 const fs = require('fs-extra');
@@ -22,776 +17,953 @@ const os = require('os');
 const app = express();
 const PORT = 3001;
 
-// Middleware - CORS configuration for web support
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: false
-}));
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'Accept'], credentials: false }));
 app.options('*', cors());
-
-// Additional CORS headers middleware
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    next();
-});
-
+app.use((req, res, next) => { res.header('Access-Control-Allow-Origin', '*'); res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.header('Access-Control-Allow-Headers', 'Content-Type'); next(); });
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-// Configuration
 const BUILDS_DIR = path.join(__dirname, 'builds');
 const PROJECTS_DIR = path.join(__dirname, 'projects');
 const APKS_DIR = path.join(__dirname, 'apks');
 const TEMP_DIR = path.join(__dirname, 'temp');
+[BUILDS_DIR, PROJECTS_DIR, APKS_DIR, TEMP_DIR].forEach(dir => fs.ensureDirSync(dir));
 
-// Ensure directories exist
-[BUILDS_DIR, PROJECTS_DIR, APKS_DIR, TEMP_DIR].forEach(dir => {
-    fs.ensureDirSync(dir);
-});
-
-// In-memory store for build states (use Redis for production)
 const buildStates = new Map();
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Helper: Extract IP address from host header or request
-// ════════════════════════════════════════════════════════════════════════════════
-function getServerIpAddress(req) {
-    // Try to get from X-Forwarded-For header (if behind proxy)
-    const forwarded = req.get('x-forwarded-for');
-    if (forwarded) {
-        return forwarded.split(',')[0].trim();
-    }
-
-    // Get from host header
-    const host = req.get('host');
-    if (host) {
-        return host.split(':')[0]; // Remove port if present
-    }
-
-    // Fallback: get local IP
-    try {
-        const interfaces = os.networkInterfaces();
-        for (const name of Object.keys(interfaces)) {
-            for (const iface of interfaces[name]) {
-                // Skip loopback and internal addresses
-                if (iface.family === 'IPv4' && !iface.internal) {
-                    return iface.address;
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('Could not detect IP:', e.message);
-    }
-
-    return '127.0.0.1';
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Health Check Endpoint (must be before other routes)
-// ════════════════════════════════════════════════════════════════════════════════
-
-/**
- * GET /health
- * Simple health check endpoint for backend availability
- * Used by Flutter app to verify backend is running
- */
-app.get('/health', (req, res) => {
-    res.json({ status: 'running' });
-});
 
 // ════════════════════════════════════════════════════════════════════════════════
 // API Routes
 // ════════════════════════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════════════════════════
-// API Endpoints (UNIFIED)
-// ════════════════════════════════════════════════════════════════════════════════
+app.get('/health', (req, res) => res.json({ status: 'running', version: SERVER_VERSION }));
 
-/**
- * GET /health
- * Health check endpoint - frontend uses this to verify backend is running
- */
-app.get('/health', (req, res) => {
-    res.json({ status: 'running' });
-});
-
-/**
- * POST /api/build/submit
- * Submit app config for APK building (PRIMARY ENDPOINT)
- * Body: App configuration JSON
- * Response: { buildId, status, message }
- */
 app.post('/api/build/submit', async (req, res) => {
     try {
         const appConfig = req.body;
-        const serverIp = getServerIpAddress(req);
+        const host = req.get('host');
+        const serverIp = host ? host.split(':')[0] : '127.0.0.1';
         const buildId = uuidv4();
         const buildDir = path.join(BUILDS_DIR, buildId);
 
-        if (!appConfig.id || !appConfig.name) {
-            return res.status(400).json({ error: 'Missing app id or name' });
-        }
+        if (!appConfig.id || !appConfig.name) return res.status(400).json({ error: 'Missing app id or name' });
 
-        // Store server info for download URL generation
         appConfig.serverIp = serverIp;
 
-        // Create build record with unified status
         const buildRecord = {
-            id: buildId,
-            appId: appConfig.id,
-            appName: appConfig.name,
-            status: 'pending',  // ✅ UNIFIED: "pending" | "building" | "complete" | "failed"
-            progress: 0,
-            startTime: Date.now(),
-            endTime: null,
-            logs: ['📋 Build queued'],
-            downloadUrl: null,
-            error: null,
+            id: buildId, appId: appConfig.id, appName: appConfig.name,
+            status: 'pending', progress: 0, startTime: Date.now(), endTime: null,
+            logs: ['📋 Build queued'], downloadUrl: null, error: null,
         };
-
         buildStates.set(buildId, buildRecord);
 
-        // Save config
         fs.ensureDirSync(buildDir);
         fs.writeJsonSync(path.join(buildDir, 'config.json'), appConfig);
 
-        // Start async build process (non-blocking)
-        startBuildProcess(buildId, appConfig, buildDir).catch(err => {
-            console.error(`Background build error for ${buildId}:`, err);
-        });
-
+        startBuildProcess(buildId, appConfig, buildDir).catch(err => console.error(`Background build error for ${buildId}:`, err));
         console.log(`✅ Build ${buildId} queued for ${appConfig.name}`);
 
-        res.json({
-            buildId,
-            status: 'pending',
-            message: 'Build request accepted. Building in background...',
-        });
+        res.json({ buildId, status: 'pending', message: 'Build request accepted. Building in background...' });
     } catch (error) {
         console.error('Build submission error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-/**
- * GET /api/build/status/:buildId
- * Get current build status, progress, logs, and download URL
- * Returns unified status: "pending" | "building" | "complete" | "failed"
- */
 app.get('/api/build/status/:buildId', (req, res) => {
     try {
         const { buildId } = req.params;
         const buildRecord = buildStates.get(buildId);
-
-        if (!buildRecord) {
-            return res.status(404).json({ error: 'Build not found' });
-        }
-
+        if (!buildRecord) return res.status(404).json({ error: 'Build not found' });
         res.json({
-            buildId,
-            status: buildRecord.status,
-            progress: buildRecord.progress,
-            logs: buildRecord.logs,
-            downloadUrl: buildRecord.downloadUrl,
-            error: buildRecord.error,
-            elapsedTime: buildRecord.endTime
-                ? buildRecord.endTime - buildRecord.startTime
-                : Date.now() - buildRecord.startTime,
+            buildId, status: buildRecord.status, progress: buildRecord.progress,
+            logs: buildRecord.logs, downloadUrl: buildRecord.downloadUrl, error: buildRecord.error,
+            elapsedTime: buildRecord.endTime ? buildRecord.endTime - buildRecord.startTime : Date.now() - buildRecord.startTime,
         });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-/**
- * POST /api/build/cancel/:buildId
- * Cancel an ongoing build
- */
 app.post('/api/build/cancel/:buildId', (req, res) => {
     try {
         const { buildId } = req.params;
         const buildRecord = buildStates.get(buildId);
-
-        if (!buildRecord) {
-            return res.status(404).json({ error: 'Build not found' });
-        }
-
-        if (buildRecord.status === 'complete' || buildRecord.status === 'failed') {
-            return res.status(400).json({ error: 'Build already finished' });
-        }
-
+        if (!buildRecord) return res.status(404).json({ error: 'Build not found' });
+        if (buildRecord.status === 'complete' || buildRecord.status === 'failed') return res.status(400).json({ error: 'Build already finished' });
         buildRecord.status = 'failed';
         buildRecord.logs.push('⛔ Build cancelled by user');
-
         res.json({ message: 'Build cancelled' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/build/logs/:buildId', (req, res) => {
+    const buildRecord = buildStates.get(req.params.buildId);
+    if (!buildRecord) return res.status(404).json({ error: 'Build not found' });
+    res.json({ logs: buildRecord.logs });
+});
+
+app.get('/api/download/:buildId', (req, res) => {
+    try {
+        const { buildId } = req.params;
+        const buildRecord = buildStates.get(buildId);
+        if (!buildRecord) return res.status(404).json({ error: 'Build not found' });
+        if (buildRecord.status !== 'complete') return res.status(400).json({ error: `Build not completed. Status: ${buildRecord.status}`, status: buildRecord.status });
+
+        const apkPath = path.join(APKS_DIR, `${buildId}.apk`);
+        if (!fs.existsSync(apkPath)) return res.status(404).json({ error: 'APK file not found' });
+
+        const stats = fs.statSync(apkPath);
+        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+        res.setHeader('Content-Disposition', 'attachment; filename="app-release.apk"');
+        res.setHeader('Content-Length', stats.size);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        const fileStream = fs.createReadStream(apkPath);
+        fileStream.pipe(res);
+        fileStream.on('error', err => { if (!res.headersSent) res.status(500).json({ error: 'Download failed' }); });
+        console.log(`📥 APK ${buildId} downloaded (${formatFileSize(stats.size)})`);
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
 // Build Process
 // ════════════════════════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════════════════════════
-// Build Process (IMPROVED)
-// ════════════════════════════════════════════════════════════════════════════════
-
 async function startBuildProcess(buildId, appConfig, buildDir) {
     const buildRecord = buildStates.get(buildId);
-
     try {
         buildRecord.logs.push('🚀 Starting APK build process...');
-        buildRecord.status = 'building';  // ✅ Transition to building
+        buildRecord.status = 'building';
         updateProgress(buildId, 5);
 
-        // Step 1: Generate Flutter project
         buildRecord.logs.push('📝 Generating Flutter project...');
         await generateFlutterProject(buildId, appConfig, buildDir);
         updateProgress(buildId, 20);
         buildRecord.logs.push('✅ Flutter project generated');
 
-        // Step 2: Install dependencies
         buildRecord.logs.push('📦 Installing dependencies (flutter pub get)...');
         await installDependencies(buildId, buildDir);
         updateProgress(buildId, 40);
         buildRecord.logs.push('✅ Dependencies installed');
 
-        // Step 3: Build APK
         buildRecord.logs.push('🔨 Building APK (flutter build apk --release)...');
         await buildApk(buildId, buildDir);
         updateProgress(buildId, 85);
         buildRecord.logs.push('✅ APK compilation completed');
 
-        // Step 4: Validate APK file exists
         buildRecord.logs.push('✔️ Validating APK file...');
         const apkPath = await validateApkExists(buildId, buildDir);
         updateProgress(buildId, 95);
         buildRecord.logs.push(`✅ APK validated (${formatFileSize(fs.statSync(apkPath).size)})`);
 
-        // Step 5: Move APK to storage
         buildRecord.logs.push('💾 Moving APK to storage...');
         await moveApkToStorage(buildId, buildDir, apkPath);
         updateProgress(buildId, 99);
 
-        // Step 6: Generate download link
-        const downloadUrl = generateDownloadLink(buildId, appConfig.serverIp);
-
-        buildRecord.status = 'complete';  // ✅ Transition to complete
+        const downloadUrl = `http://${appConfig.serverIp}:${PORT}/api/download/${buildId}`;
+        buildRecord.status = 'complete';
         buildRecord.progress = 100;
         buildRecord.downloadUrl = downloadUrl;
         buildRecord.endTime = Date.now();
         buildRecord.logs.push('✅ Build completed successfully!');
         buildRecord.logs.push(`📥 Download URL: ${downloadUrl}`);
-
         console.log(`✅ Build ${buildId} completed successfully`);
     } catch (error) {
         console.error(`❌ Build ${buildId} failed:`, error);
-        buildRecord.status = 'failed';  // ✅ Transition to failed
+        buildRecord.status = 'failed';
         buildRecord.error = error.message;
         buildRecord.endTime = Date.now();
-        buildRecord.logs.push(`\n❌ BUILD FAILED:`);
-        buildRecord.logs.push(`Error: ${error.message}`);
-        buildRecord.logs.push(`\n💡 Troubleshooting:`);
-        buildRecord.logs.push(`1. Check backend console for detailed error messages`);
-        buildRecord.logs.push(`2. Ensure Flutter SDK is installed and in PATH`);
-        buildRecord.logs.push(`3. Ensure Android SDK is installed and configured`);
+        buildRecord.logs.push(`❌ BUILD FAILED: ${error.message}`);
+        buildRecord.logs.push('💡 Check backend console for details. Ensure Flutter SDK and Android SDK are configured.');
     }
-}
-
-async function generateFlutterProject(buildId, appConfig, buildDir) {
-    const projectDir = path.join(buildDir, 'flutter_app');
-    fs.ensureDirSync(projectDir);
-
-    // Step 1: Create pubspec.yaml
-    const pubspec = generatePubspec(appConfig);
-    fs.writeFileSync(
-        path.join(projectDir, 'pubspec.yaml'),
-        pubspec
-    );
-
-    // Step 2: Create main.dart
-    const mainDart = generateMainDart(appConfig);
-    fs.ensureDirSync(path.join(projectDir, 'lib'));
-    fs.writeFileSync(
-        path.join(projectDir, 'lib', 'main.dart'),
-        mainDart
-    );
-
-    // Step 3: Create Android directory structure
-    const packageName = sanitizePackageName(appConfig.name);
-    const kotlinDir = path.join(projectDir, 'android', 'app', 'src', 'main', 'kotlin', packageName.replace(/\./g, '/'));
-    fs.ensureDirSync(kotlinDir);
-
-    // Step 4: Create MainActivity.kt (v2 embedding)
-    const mainActivityKt = generateMainActivityKt(packageName);
-    fs.writeFileSync(
-        path.join(kotlinDir, 'MainActivity.kt'),
-        mainActivityKt
-    );
-
-    // Step 5: Create AndroidManifest.xml
-    const androidManifest = generateAndroidManifest(appConfig, packageName);
-    fs.ensureDirSync(path.join(projectDir, 'android', 'app', 'src', 'main'));
-    fs.writeFileSync(
-        path.join(projectDir, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'),
-        androidManifest
-    );
-
-    // Step 6: Create gradle.properties with v2 embedding support
-    const gradleProperties = generateGradleProperties();
-    fs.ensureDirSync(path.join(projectDir, 'android'));
-    fs.writeFileSync(
-        path.join(projectDir, 'android', 'gradle.properties'),
-        gradleProperties
-    );
-
-    // Step 7: Create build.gradle (Module: app)
-    const appBuildGradle = generateAppBuildGradle(packageName);
-    fs.ensureDirSync(path.join(projectDir, 'android', 'app'));
-    fs.writeFileSync(
-        path.join(projectDir, 'android', 'app', 'build.gradle'),
-        appBuildGradle
-    );
-
-    // Step 8: Create build.gradle (Project: android)
-    const projectBuildGradle = generateProjectBuildGradle();
-    fs.writeFileSync(
-        path.join(projectDir, 'android', 'build.gradle'),
-        projectBuildGradle
-    );
-
-    // Step 9: Create settings.gradle
-    const settingsGradle = generateSettingsGradle();
-    fs.writeFileSync(
-        path.join(projectDir, 'android', 'settings.gradle'),
-        settingsGradle
-    );
-
-    // Step 10: Create .gitignore
-    const gitignore = generateGitignore();
-    fs.writeFileSync(
-        path.join(projectDir, '.gitignore'),
-        gitignore
-    );
-
-    // Step 11: Create Android resources (styles.xml for LaunchTheme)
-    const resDir = path.join(projectDir, 'android', 'app', 'src', 'main', 'res');
-    const valuesDir = path.join(resDir, 'values');
-    fs.ensureDirSync(valuesDir);
-
-    const stylesXml = generateStylesXml();
-    fs.writeFileSync(
-        path.join(valuesDir, 'styles.xml'),
-        stylesXml
-    );
-
-    // Step 12: Create local.properties
-    const localProperties = generateLocalProperties();
-    fs.writeFileSync(
-        path.join(projectDir, 'android', 'local.properties'),
-        localProperties
-    );
-
-    // Step 13: Create drawable resources
-    const drawableDir = path.join(resDir, 'drawable');
-    fs.ensureDirSync(drawableDir);
-
-    const launchBackground = generateLaunchBackgroundXml();
-    fs.writeFileSync(
-        path.join(drawableDir, 'launch_background.xml'),
-        launchBackground
-    );
-
-    // Step 14: Create color resources
-    const colorsDir = path.join(resDir, 'values');
-    const colorsXml = generateColorsXml();
-    fs.writeFileSync(
-        path.join(colorsDir, 'colors.xml'),
-        colorsXml
-    );
 }
 
 async function installDependencies(buildId, buildDir) {
     const projectDir = path.join(buildDir, 'flutter_app');
     const buildRecord = buildStates.get(buildId);
-
     return new Promise((resolve, reject) => {
-        const command = `cd "${projectDir}" && flutter pub get`;
-
-        exec(
-            command,
-            { maxBuffer: 10 * 1024 * 1024, shell: true },
-            (error, stdout, stderr) => {
-                if (error) {
-                    const errorMsg = stderr || stdout || error.message;
-                    buildRecord.logs.push(`\n⚠️ Dependency installation output:`);
-                    buildRecord.logs.push(errorMsg);
-                    reject(new Error(`Dependency installation failed: ${errorMsg}`));
-                } else {
-                    resolve();
-                }
-            }
-        );
+        exec(`cd "${projectDir}" && flutter pub get`, { maxBuffer: 10 * 1024 * 1024, shell: true }, (error, stdout, stderr) => {
+            if (error) { const msg = stderr || stdout || error.message; buildRecord.logs.push(msg); reject(new Error(`Dependency installation failed: ${msg}`)); }
+            else resolve();
+        });
     });
 }
 
 async function buildApk(buildId, buildDir) {
     const projectDir = path.join(buildDir, 'flutter_app');
     const buildRecord = buildStates.get(buildId);
-
     return new Promise((resolve, reject) => {
-        const command = `cd "${projectDir}" && flutter build apk --release 2>&1`;
-
-        exec(
-            command,
-            { maxBuffer: 50 * 1024 * 1024, timeout: 30 * 60 * 1000, shell: true },
-            (error, stdout, stderr) => {
-                if (error) {
-                    // Capture both stdout and stderr
-                    const fullOutput = (stdout || '') + (stderr || '');
-
-                    buildRecord.logs.push(`\n📋 Build Output:`);
-                    fullOutput.split('\n').forEach(line => {
-                        if (line.trim()) {
-                            buildRecord.logs.push(line);
-                        }
-                    });
-
-                    const errorMsg = stderr || stdout || error.message || 'Unknown build error';
-                    reject(new Error(`APK build failed: ${errorMsg}`));
-                } else {
-                    resolve();
-                }
-            }
-        );
+        exec(`cd "${projectDir}" && flutter build apk --release 2>&1`, { maxBuffer: 50 * 1024 * 1024, timeout: 30 * 60 * 1000, shell: true }, (error, stdout, stderr) => {
+            if (error) {
+                const fullOutput = (stdout || '') + (stderr || '');
+                fullOutput.split('\n').forEach(line => { if (line.trim()) buildRecord.logs.push(line); });
+                reject(new Error(`APK build failed: ${stderr || stdout || error.message}`));
+            } else resolve();
+        });
     });
 }
 
 async function validateApkExists(buildId, buildDir) {
-    const flutterProjectDir = path.join(buildDir, 'flutter_app');
-    const apkSource = path.join(
-        flutterProjectDir,
-        'build',
-        'app',
-        'outputs',
-        'flutter-apk',
-        'app-release.apk'
-    );
-
-    if (!fs.existsSync(apkSource)) {
-        throw new Error(`APK file not found at expected location: ${apkSource}`);
+    // Check both the redirected path (after build.gradle fix) and the fallback
+    const candidates = [
+        path.join(buildDir, 'flutter_app', 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk'),
+        path.join(buildDir, 'flutter_app', 'android', 'app', 'build', 'outputs', 'flutter-apk', 'app-release.apk'),
+        path.join(buildDir, 'flutter_app', 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk'),
+    ];
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate) && fs.statSync(candidate).size > 0) {
+            console.log(`[build] APK found at: ${candidate}`);
+            return candidate;
+        }
     }
-
-    const stats = fs.statSync(apkSource);
-    if (stats.size <= 0) {
-        throw new Error(`APK file is empty or corrupted (size: ${stats.size} bytes)`);
-    }
-
-    return apkSource;
+    throw new Error(`APK not found. Checked:\n${candidates.join('\n')}`);
 }
 
 async function moveApkToStorage(buildId, buildDir, apkSource) {
     const apkDest = path.join(APKS_DIR, `${buildId}.apk`);
-
-    try {
-        await fs.copy(apkSource, apkDest);
-
-        // Verify copy was successful
-        if (!fs.existsSync(apkDest)) {
-            throw new Error('APK copy verification failed');
-        }
-
-        const stats = fs.statSync(apkDest);
-        if (stats.size <= 0) {
-            throw new Error('APK copy resulted in empty file');
-        }
-    } catch (error) {
-        throw new Error(`Failed to move APK to storage: ${error.message}`);
-    }
-
+    await fs.copy(apkSource, apkDest);
+    if (!fs.existsSync(apkDest) || fs.statSync(apkDest).size <= 0) throw new Error('APK copy failed');
     return apkDest;
-}
-
-function generateDownloadLink(buildId, serverIp) {
-    // Use the detected server IP for download URL
-    return `http://${serverIp}:${PORT}/api/download/${buildId}`;
 }
 
 function updateProgress(buildId, progress) {
     const buildRecord = buildStates.get(buildId);
-    if (buildRecord) {
-        buildRecord.progress = Math.min(progress, 99); // Never reach 100% until complete
-    }
+    if (buildRecord) buildRecord.progress = Math.min(progress, 99);
 }
 
-function formatFileSize(bytes) {
-    const mb = (bytes / 1024 / 1024).toFixed(2);
-    return `${mb} MB`;
+function formatFileSize(bytes) { return `${(bytes / 1024 / 1024).toFixed(2)} MB`; }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Flutter Project Generation
+// ════════════════════════════════════════════════════════════════════════════════
+
+async function generateFlutterProject(buildId, appConfig, buildDir) {
+    const projectDir = path.join(buildDir, 'flutter_app');
+    fs.ensureDirSync(projectDir);
+
+    // Host project paths (for copying shared resources)
+    const hostAndroidDir = path.join(__dirname, '..', 'android');
+
+    // Use the package name already registered in google-services.json so Firebase
+    // doesn't throw "No matching client found for package name".
+    let packageName = sanitizePackageName(appConfig.name);
+    const hostGoogleServicesPath = path.join(hostAndroidDir, 'app', 'google-services.json');
+    if (fs.existsSync(hostGoogleServicesPath)) {
+        try {
+            const gsJson = fs.readJsonSync(hostGoogleServicesPath);
+            const registeredPkg = (gsJson.client || [])[0]
+                ?.client_info?.android_client_info?.package_name;
+            if (registeredPkg) packageName = registeredPkg;
+        } catch (e) {
+            console.warn('Could not read package name from google-services.json:', e.message);
+        }
+    }
+
+    // lib/main.dart
+    fs.ensureDirSync(path.join(projectDir, 'lib'));
+    fs.writeFileSync(path.join(projectDir, 'lib', 'main.dart'), generateMainDart(appConfig));
+
+    // pubspec.yaml
+    fs.writeFileSync(path.join(projectDir, 'pubspec.yaml'), generatePubspec(appConfig));
+
+    // .gitignore
+    fs.writeFileSync(path.join(projectDir, '.gitignore'), generateGitignore());
+
+    // Android directory
+    fs.ensureDirSync(path.join(projectDir, 'android'));
+
+    // gradle.properties
+    fs.writeFileSync(path.join(projectDir, 'android', 'gradle.properties'), generateGradleProperties());
+
+    // settings.gradle.kts
+    fs.writeFileSync(path.join(projectDir, 'android', 'settings.gradle.kts'), generateSettingsGradleKts());
+
+    // build.gradle.kts (project level)
+    fs.writeFileSync(path.join(projectDir, 'android', 'build.gradle.kts'), generateProjectBuildGradleKts());
+
+    // app/build.gradle.kts
+    fs.ensureDirSync(path.join(projectDir, 'android', 'app'));
+    fs.writeFileSync(path.join(projectDir, 'android', 'app', 'build.gradle.kts'), generateAppBuildGradleKts(packageName));
+
+    // AndroidManifest.xml
+    fs.ensureDirSync(path.join(projectDir, 'android', 'app', 'src', 'main'));
+    fs.writeFileSync(path.join(projectDir, 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), generateAndroidManifest(appConfig, packageName));
+
+    // MainActivity.kt
+    const kotlinParts = packageName.split('.');
+    const kotlinDir = path.join(projectDir, 'android', 'app', 'src', 'main', 'kotlin', ...kotlinParts);
+    fs.ensureDirSync(kotlinDir);
+    fs.writeFileSync(path.join(kotlinDir, 'MainActivity.kt'), generateMainActivityKt(packageName));
+
+    // Android resources — only what the build strictly needs.
+    // No @mipmap/ic_launcher in the manifest, so no PNG files required.
+    const resDir = path.join(projectDir, 'android', 'app', 'src', 'main', 'res');
+    fs.ensureDirSync(path.join(resDir, 'values'));
+    fs.ensureDirSync(path.join(resDir, 'drawable'));
+    fs.writeFileSync(path.join(resDir, 'values', 'styles.xml'), generateStylesXml());
+    fs.writeFileSync(path.join(resDir, 'values', 'colors.xml'), generateColorsXml());
+    fs.writeFileSync(path.join(resDir, 'drawable', 'launch_background.xml'), generateLaunchBackgroundXml());
+
+    // local.properties — copy from host (has real flutter.sdk and sdk.dir paths)
+    const hostLocalProps = path.join(hostAndroidDir, 'local.properties');
+    if (fs.existsSync(hostLocalProps)) {
+        // Copy but strip flutter.buildMode line so release build works
+        const contents = fs.readFileSync(hostLocalProps, 'utf8')
+            .split('\n')
+            .filter(line => !line.startsWith('flutter.buildMode'))
+            .join('\n');
+        fs.writeFileSync(path.join(projectDir, 'android', 'local.properties'), contents);
+    }
+
+    // google-services.json — copy from host Firebase project (package name already matched above)
+    if (fs.existsSync(hostGoogleServicesPath)) {
+        fs.copySync(hostGoogleServicesPath, path.join(projectDir, 'android', 'app', 'google-services.json'));
+    }
+
+    // Gradle wrapper — copy from host (binary jar + properties + scripts)
+    const hostWrapperDir = path.join(hostAndroidDir, 'gradle', 'wrapper');
+    const genWrapperDir = path.join(projectDir, 'android', 'gradle', 'wrapper');
+    fs.ensureDirSync(genWrapperDir);
+    ['gradle-wrapper.jar', 'gradle-wrapper.properties'].forEach(f => {
+        const src = path.join(hostWrapperDir, f);
+        if (fs.existsSync(src)) fs.copySync(src, path.join(genWrapperDir, f));
+    });
+    ['gradlew', 'gradlew.bat'].forEach(f => {
+        const src = path.join(hostAndroidDir, f);
+        if (fs.existsSync(src)) fs.copySync(src, path.join(projectDir, 'android', f));
+    });
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Code Generation Functions
+// Code Generation — main.dart (generates real UI from widget tree)
+// ════════════════════════════════════════════════════════════════════════════════
+
+function generateMainDart(appConfig) {
+    const screens = appConfig.screens || [];
+    const projectId = String(appConfig.id || 'project_id');
+    const appName = String(appConfig.name || 'My App');
+    const rawPrimaryColor = String((appConfig.theme || {}).primaryColor || '#00C896').replace(/^#/, '');
+
+    // Escape a string for use inside a Dart single-quoted literal
+    const esc = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
+
+    // Convert hex color to Dart Color constructor
+    const hexColor = (hex) => {
+        const c = String(hex || '#000000').replace(/^#/, '').padEnd(6, '0').slice(0, 6);
+        return `Color(0xFF${c.toUpperCase()})`;
+    };
+
+    // Make a safe Dart identifier from a widget ID
+    const dartId = (s) => 'w' + String(s).replace(/[^a-zA-Z0-9]/g, '_');
+
+    // Recursively collect all input widget IDs in a widget list
+    function collectInputIds(widgets) {
+        const ids = [];
+        for (const w of (widgets || [])) {
+            if (w.type === 'input') ids.push(w.id);
+            ids.push(...collectInputIds(w.children));
+        }
+        return ids;
+    }
+
+    // Generate Dart code for a single widget
+    function genWidget(w) {
+        const p = w.properties || {};
+        if (w.type === 'appbar' || w.type === 'navbar') return null;
+
+        switch (w.type) {
+            case 'text': {
+                const content = esc(p.content || 'Text');
+                const fontSize = Number(p.fontSize) || 16;
+                const color = hexColor(p.color);
+                const bold = p.bold ? 'FontWeight.bold' : 'FontWeight.normal';
+                const alignMap = { left: 'TextAlign.left', center: 'TextAlign.center', right: 'TextAlign.right' };
+                const align = alignMap[p.align] || 'TextAlign.left';
+                return `Text('${content}', textAlign: ${align}, style: const TextStyle(fontSize: ${fontSize}, color: ${color}, fontWeight: ${bold}))`;
+            }
+
+            case 'button': {
+                const label = esc(p.label || 'Button');
+                const color = hexColor(p.color || '#00C896');
+                const textColor = hexColor(p.textColor || '#FFFFFF');
+                const radius = Number(p.borderRadius) || 12;
+                const action = p.action || 'none';
+                let onPressed = '() {}';
+                if (action === 'addRecord') {
+                    const table = esc(p.actionTable || '');
+                    const fields = String(p.actionFields || '').split(',').map(f => f.trim()).filter(Boolean);
+                    // Only wire up the dialog when a table has actually been selected.
+                    // An empty table name would produce .collection('') which Firestore
+                    // rejects with "A collectionPath must be a non-empty string".
+                    if (table) {
+                        const fieldsArr = '[' + fields.map(f => `'${esc(f)}'`).join(', ') + ']';
+                        onPressed = `() => _showAddRecordDialog(context, '${table}', ${fieldsArr})`;
+                    }
+                }
+                return `ElevatedButton(onPressed: ${onPressed}, style: ElevatedButton.styleFrom(backgroundColor: const ${color}, foregroundColor: const ${textColor}, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(${radius}))), child: const Text('${label}'))`;
+            }
+
+            case 'input': {
+                const hint = esc(p.hint || '');
+                const label = esc(p.label || '');
+                const isPassword = p.type === 'password';
+                const keyboard = isPassword ? 'TextInputType.visiblePassword' : p.type === 'number' ? 'TextInputType.number' : 'TextInputType.text';
+                return `TextField(controller: _ctrl_${dartId(w.id)}, obscureText: ${isPassword}, keyboardType: ${keyboard}, decoration: const InputDecoration(hintText: '${hint}', labelText: '${label}', border: OutlineInputBorder()))`;
+            }
+
+            case 'image': {
+                const src = esc(p.src || '');
+                const radius = Number(p.borderRadius) || 0;
+                const fitMap = { cover: 'BoxFit.cover', contain: 'BoxFit.contain', fill: 'BoxFit.fill' };
+                const fit = fitMap[p.fit] || 'BoxFit.cover';
+                if (!src) return `Container(height: 180, color: Colors.grey.shade200, child: const Icon(Icons.image, size: 48, color: Colors.grey))`;
+                return `ClipRRect(borderRadius: BorderRadius.circular(${radius}), child: Image.network('${src}', fit: ${fit}, errorBuilder: (ctx, e, st) => const Icon(Icons.broken_image)))`;
+            }
+
+            case 'card': {
+                const title = esc(p.title || 'Card Title');
+                const subtitle = esc(p.subtitle || '');
+                const titleColor = hexColor(p.titleColor || '#000000');
+                const subtitleColor = hexColor(p.subtitleColor || '#666666');
+                const sub = subtitle ? `, const SizedBox(height: 4), Text('${subtitle}', style: const TextStyle(color: ${subtitleColor}))` : '';
+                return `Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${title}', style: const TextStyle(fontWeight: FontWeight.bold, color: ${titleColor}))${sub}])))`;
+            }
+
+            case 'divider': return `Divider(color: const ${hexColor(p.color || '#CCCCCC')}, thickness: ${Number(p.thickness) || 1})`;
+
+            case 'icon': {
+                const name = String(p.name || 'star').toLowerCase().replace(/[^a-z_0-9]/g, '_');
+                return `Icon(Icons.${name}, color: const ${hexColor(p.color || '#FFD700')}, size: ${Number(p.size) || 40})`;
+            }
+
+            case 'circleavatar': {
+                const imgUrl = esc(p.imageUrl || '');
+                const radius = Number(p.radius) || 40;
+                if (imgUrl) return `CircleAvatar(radius: ${radius}, backgroundImage: NetworkImage('${imgUrl}'))`;
+                return `CircleAvatar(radius: ${radius}, backgroundColor: const ${hexColor(p.backgroundColor || '#00C896')}, child: Text('${esc(p.text || 'AB')}', style: const TextStyle(color: ${hexColor(p.textColor || '#FFFFFF')}, fontSize: ${Number(p.fontSize) || 18})))`;
+            }
+
+            case 'listtile': {
+                const sub = esc(p.subtitle || '');
+                const subCode = sub ? `subtitle: const Text('${sub}')` : '';
+                return `ListTile(tileColor: const ${hexColor(p.backgroundColor || '#FFFFFF')}, title: Text('${esc(p.title || 'Item')}', style: const TextStyle(color: ${hexColor(p.textColor || '#000000')}))${subCode ? ', ' + subCode : ''})`;
+            }
+
+            case 'dropdown': {
+                const hint = esc(p.hint || 'Select...');
+                const options = String(p.options || '').split(',').map(o => o.trim()).filter(Boolean);
+                const items = options.map(o => `DropdownMenuItem<String>(value: '${esc(o)}', child: Text('${esc(o)}'))`).join(', ');
+                return `DropdownButtonFormField<String>(hint: const Text('${hint}'), items: [${items}], onChanged: (v) {}, decoration: const InputDecoration(border: OutlineInputBorder()))`;
+            }
+
+            case 'checkbox': return `_CheckboxWidget(label: '${esc(p.label || 'Check me')}', activeColor: const ${hexColor(p.color || '#00C896')})`;
+            case 'switch_w': return `_SwitchWidget(label: '${esc(p.label || 'Toggle')}', activeColor: const ${hexColor(p.color || '#00C896')})`;
+
+            case 'container': {
+                const children = (w.children || []).map(genWidget).filter(Boolean);
+                const child = children.length > 0 ? `Column(children: [${children.join(', ')}])` : 'const SizedBox()';
+                return `Container(decoration: BoxDecoration(color: const ${hexColor(p.bgColor || p.color || '#E8E8E8')}, borderRadius: BorderRadius.circular(${Number(p.borderRadius) || 8}), border: Border.all(color: const ${hexColor(p.borderColor || '#CCCCCC')}, width: ${Number(p.borderWidth) || 1})), child: ${child})`;
+            }
+
+            case 'row': {
+                const mainAxisMap = { start: 'MainAxisAlignment.start', center: 'MainAxisAlignment.center', end: 'MainAxisAlignment.end', spaceBetween: 'MainAxisAlignment.spaceBetween', spaceAround: 'MainAxisAlignment.spaceAround' };
+                const mainAxis = mainAxisMap[p.mainAxisAlignment] || 'MainAxisAlignment.start';
+                let children = (w.children || []).map(genWidget).filter(Boolean);
+                const spacing = Number(p.spacing) || 0;
+                if (spacing > 0) {
+                    const spaced = [];
+                    children.forEach((c, i) => { if (i > 0) spaced.push(`SizedBox(width: ${spacing})`); spaced.push(c); });
+                    children = spaced;
+                }
+                return `Row(mainAxisAlignment: ${mainAxis}, children: [${children.join(', ')}])`;
+            }
+
+            case 'column': {
+                const mainAxis = { start: 'MainAxisAlignment.start', center: 'MainAxisAlignment.center', end: 'MainAxisAlignment.end' }[p.mainAxisAlignment] || 'MainAxisAlignment.start';
+                let children = (w.children || []).map(genWidget).filter(Boolean);
+                const spacing = Number(p.spacing) || 0;
+                if (spacing > 0) {
+                    const spaced = [];
+                    children.forEach((c, i) => { if (i > 0) spaced.push(`SizedBox(height: ${spacing})`); spaced.push(c); });
+                    children = spaced;
+                }
+                return `Column(mainAxisAlignment: ${mainAxis}, crossAxisAlignment: CrossAxisAlignment.stretch, children: [${children.join(', ')}])`;
+            }
+
+            case 'list': {
+                const items = String(p.items || '').split(',').map(i => i.trim()).filter(Boolean);
+                const textColor = hexColor(p.textColor || '#000000');
+                return `Column(children: [${items.map(item => `ListTile(dense: true, title: Text('${esc(item)}', style: const TextStyle(color: ${textColor})))`).join(', ')}])`;
+            }
+
+            case 'iconbtn': {
+                const iconName = String(p.icon || 'favorite').toLowerCase().replace(/[^a-z_0-9]/g, '_');
+                const bgColor = hexColor(p.color || '#00C896');
+                const icColor = hexColor(p.iconColor || '#FFFFFF');
+                const action = p.action || 'none';
+                let onPressed = '() {}';
+                if (action === 'addRecord') {
+                    const table = esc(p.actionTable || '');
+                    const fields = String(p.actionFields || '').split(',').map(f => f.trim()).filter(Boolean);
+                    if (table) {
+                        const fieldsArr = '[' + fields.map(f => `'${esc(f)}'`).join(', ') + ']';
+                        onPressed = `() => _showAddRecordDialog(context, '${table}', ${fieldsArr})`;
+                    }
+                }
+                return `IconButton(style: IconButton.styleFrom(backgroundColor: const ${bgColor}), icon: Icon(Icons.${iconName}, color: const ${icColor}), onPressed: ${onPressed})`;
+            }
+
+            case 'listview': {
+                if (w.boundTable) {
+                    const table = esc(w.boundTable);
+                    const primaryC = hexColor('#' + rawPrimaryColor);
+                    // Live Firestore stream with name/avatar ListTile layout
+                    return `SizedBox(height: 300, child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('project_data').doc('${esc(projectId)}').collection('${table}').orderBy('createdAt', descending: true).snapshots(), builder: (ctx, snap) { if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator()); if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text('No records yet', style: const TextStyle(color: Colors.grey))); final docs = snap.data!.docs; return ListView.builder(itemCount: docs.length, shrinkWrap: true, itemBuilder: (ctx, i) { final data = Map<String, dynamic>.from(docs[i].data() as Map); data.remove('createdAt'); final entries = data.entries.toList(); final titleVal = entries.isNotEmpty ? entries.first.value.toString() : ''; final subtitleVal = entries.skip(1).take(2).map((e) => e.value.toString()).where((v) => v.isNotEmpty).join(' · '); final letter = titleVal.isNotEmpty ? titleVal[0].toUpperCase() : '?'; return ListTile(leading: CircleAvatar(backgroundColor: const ${primaryC}, child: Text(letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))), title: Text(titleVal, style: const TextStyle(fontWeight: FontWeight.w600)), subtitle: subtitleVal.isNotEmpty ? Text(subtitleVal, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)) : null); }); }))`;
+                }
+                const items = String(p.items || '').split(',').map(i => i.trim()).filter(Boolean);
+                const textColor = hexColor(p.textColor || '#000000');
+                return `Column(children: [${items.map(i => `ListTile(dense: true, title: Text('${esc(i)}', style: const TextStyle(color: ${textColor})))`).join(', ')}])`;
+            }
+
+            case 'singlechildscrollview': {
+                const children = (w.children || []).map(genWidget).filter(Boolean);
+                return `SingleChildScrollView(child: Column(children: [${children.join(', ')}]))`;
+            }
+
+            case 'form': {
+                const fields = String(p.fields || '').split(',').map(f => f.trim()).filter(Boolean);
+                const submitLabel = esc(p.submitLabel || 'Submit');
+                const parts = fields.map(f => `TextFormField(decoration: const InputDecoration(labelText: '${esc(f)}', border: OutlineInputBorder()))`);
+                parts.push(`ElevatedButton(onPressed: () {}, child: const Text('${submitLabel}'))`);
+                return `Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [${parts.join(', const SizedBox(height: 12), ')}])`;
+            }
+
+            case 'grid': {
+                const items = String(p.items || '').split(',').map(i => i.trim()).filter(Boolean);
+                const crossAxisCount = Math.max(1, Math.round(Number(p.crossAxisCount || p.columns) || 2));
+                const textColor = hexColor(p.textColor || '#000000');
+                return `GridView.count(crossAxisCount: ${crossAxisCount}, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), children: [${items.map(item => `Card(child: Center(child: Text('${esc(item)}', style: const TextStyle(color: ${textColor}))))`).join(', ')}])`;
+            }
+
+            case 'chart': return `Container(height: 160, color: Colors.grey.shade100, child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.bar_chart, size: 48, color: Colors.grey), Text('Chart')])))`;
+
+            case 'todo':
+            case 'checkbox_todo': {
+                const items = String(p.items || '').split(',').map(i => i.trim()).filter(Boolean);
+                const color = hexColor(p.color || '#00C896');
+                return `Column(children: [${items.map(item => `_CheckboxWidget(label: '${esc(item)}', activeColor: const ${color})`).join(', ')}])`;
+            }
+
+            case 'gesture_detector': {
+                const label = esc(p.label || 'Tap me');
+                const bg = hexColor(p.bgColor || '#00C896');
+                const textColor = hexColor(p.textColor || '#FFFFFF');
+                return `GestureDetector(onTap: () {}, child: Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const ${bg}, borderRadius: BorderRadius.circular(${Number(p.borderRadius) || 8})), child: Center(child: Text('${label}', style: const TextStyle(color: ${textColor}, fontSize: ${Number(p.fontSize) || 14})))))`;
+            }
+
+            default: return `Container(height: 40, color: Colors.grey.shade200, child: Center(child: Text('${esc(w.type)}', style: const TextStyle(color: Colors.grey))))`;
+        }
+    }
+
+    // Generate a StatefulWidget class for one screen
+    function genScreen(screen, index) {
+        const className = `AppScreen${index}`;
+        const allWidgets = screen.widgets || [];
+
+        const appbarWidget = allWidgets.find(w => w.type === 'appbar');
+        const navbarWidget = allWidgets.find(w => w.type === 'navbar');
+        const fabWidget    = allWidgets.find(w => w.type === 'fab');
+        // FAB lives in Scaffold.floatingActionButton, not in body
+        const bodyWidgets  = allWidgets.filter(w => w.type !== 'appbar' && w.type !== 'navbar' && w.type !== 'fab');
+
+        const inputIds = collectInputIds(bodyWidgets);
+        const controllerDecls = inputIds.map(id => `  final TextEditingController _ctrl_${dartId(id)} = TextEditingController();`).join('\n');
+        const controllerDispose = inputIds.map(id => `    _ctrl_${dartId(id)}.dispose();`).join('\n');
+
+        // AppBar — always include search icon that navigates to /search
+        let appBarCode = '';
+        if (appbarWidget) {
+            const ap = appbarWidget.properties || {};
+            const bgC = hexColor(ap.color || '#00C896');
+            const fgC = hexColor(ap.textColor || '#FFFFFF');
+            appBarCode = `appBar: AppBar(title: Text('${esc(ap.title || screen.name)}'), backgroundColor: const ${bgC}, foregroundColor: const ${fgC}, actions: [IconButton(icon: const Icon(Icons.search), onPressed: () => Navigator.pushNamed(context, '/search'), tooltip: 'Search')]),`;
+        }
+
+        // BottomNavigationBar
+        let bottomNavCode = '';
+        const hasNavbar = !!navbarWidget;
+        if (navbarWidget) {
+            const np = navbarWidget.properties || {};
+            const tabs = np.tabs || [];
+            const iconMap = { home: 'home', search: 'search', person: 'person', settings: 'settings', favorite: 'favorite', star: 'star' };
+            const items = tabs.map(t => `BottomNavigationBarItem(icon: Icon(Icons.${iconMap[t.icon] || 'circle'}), label: '${esc(t.label || '')}')`).join(', ');
+            bottomNavCode = `bottomNavigationBar: BottomNavigationBar(currentIndex: _navIndex, onTap: (i) => setState(() => _navIndex = i), selectedItemColor: const ${hexColor(np.activeColor || '#00C896')}, unselectedItemColor: const ${hexColor(np.inactiveColor || '#999999')}, items: [${items}]),`;
+        }
+
+        // FAB — extracted to Scaffold.floatingActionButton
+        let fabCode = '';
+        if (fabWidget) {
+            const fp = fabWidget.properties || {};
+            const iconName = String(fp.icon || 'add').toLowerCase().replace(/[^a-z_0-9]/g, '_');
+            const bgC = hexColor(fp.color || '#00C896');
+            const action = fp.action || 'none';
+            let onPressed = '() {}';
+            if (action === 'addRecord') {
+                const table = esc(fp.actionTable || '');
+                const fields = String(fp.actionFields || '').split(',').map(f => f.trim()).filter(Boolean);
+                if (table) {
+                    const fieldsArr = '[' + fields.map(f => `'${esc(f)}'`).join(', ') + ']';
+                    onPressed = `() => _showAddRecordDialog(context, '${table}', ${fieldsArr})`;
+                }
+            }
+            fabCode = `floatingActionButton: FloatingActionButton(backgroundColor: const ${bgC}, onPressed: ${onPressed}, child: Icon(Icons.${iconName}, color: Colors.white)),`;
+        }
+
+        // Body widgets
+        const widgetCodes = bodyWidgets
+            .map(w => genWidget(w))
+            .filter(Boolean)
+            .map(code => `            Padding(padding: const EdgeInsets.only(bottom: 8), child: ${code})`);
+
+        return `
+class ${className} extends StatefulWidget {
+  const ${className}({super.key});
+  @override
+  State<${className}> createState() => _${className}State();
+}
+
+class _${className}State extends State<${className}> {
+${controllerDecls || '  // no input fields'}
+${hasNavbar ? '  int _navIndex = 0;' : ''}
+
+  @override
+  void dispose() {
+${controllerDispose || '    // nothing to dispose'}
+    super.dispose();
+  }
+
+  void _showAddRecordDialog(BuildContext ctx, String table, List<String> fields) {
+    // Guard: Firestore rejects empty collection paths immediately.
+    if (table.trim().isEmpty) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('Button has no target table configured. Open the builder and set "Target Table" for this button.')),
+      );
+      return;
+    }
+    if (fields.isEmpty) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('No fields selected for this button. Open the builder and pick the fields to collect.')),
+      );
+      return;
+    }
+    final ctrl = <String, TextEditingController>{for (final f in fields) f: TextEditingController()};
+    showDialog(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: const Text('Add Record'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: fields.map((f) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(controller: ctrl[f], decoration: InputDecoration(labelText: f, border: const OutlineInputBorder())),
+            )).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final data = <String, dynamic>{for (final f in fields) f: ctrl[f]!.text.trim()};
+              try {
+                await FirebaseFirestore.instance
+                    .collection('project_data')
+                    .doc('${esc(projectId)}')
+                    .collection(table.trim())
+                    .add(<String, dynamic>{...data, 'createdAt': FieldValue.serverTimestamp()});
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Record saved successfully!')),
+                  );
+                }
+              } catch (e) {
+                if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error saving record: \${e.toString()}')));
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      ${appBarCode}
+      ${bottomNavCode}
+      ${fabCode}
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+${widgetCodes.join(',\n') || '            const Center(child: Text(\'Empty screen\'))'}
+          ],
+        ),
+      ),
+    );
+  }
+}`;
+    }
+
+    // Build routes map — include /search as a permanent route
+    const screenRoutes = screens.map((s, i) => {
+        const route = i === 0 ? '/' : `/${dartId(s.id)}`;
+        return `        '${route}': (ctx) => const AppScreen${i}()`;
+    });
+    const allTables = (appConfig.backendConfig || {}).tables || [];
+    const tableNamesList = '[' + allTables.map(t => `'${esc(t.name)}'`).join(', ') + ']';
+    screenRoutes.push(`        '/search': (ctx) => SearchScreen(projectId: '${esc(projectId)}', tableNames: const ${tableNamesList}, primaryColor: const ${hexColor('#' + rawPrimaryColor)})`);
+    const routes = screenRoutes.join(',\n');
+
+    const screenClasses = screens.map((s, i) => genScreen(s, i)).join('\n');
+
+    const primaryColorDart = hexColor('#' + rawPrimaryColor);
+
+    return `import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const GeneratedApp());
+}
+
+class GeneratedApp extends StatelessWidget {
+  const GeneratedApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '${esc(appName)}',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const ${primaryColorDart}),
+        useMaterial3: true,
+      ),
+      initialRoute: '/',
+      routes: {
+${routes}
+      },
+    );
+  }
+}
+${screenClasses}
+
+// ─── Search Screen ────────────────────────────────────────────────────────────
+
+class SearchScreen extends StatefulWidget {
+  final String projectId;
+  final List<String> tableNames;
+  final Color primaryColor;
+  const SearchScreen({super.key, required this.projectId, required this.tableNames, required this.primaryColor});
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  String _query = '';
+  bool _loading = false;
+  final List<Map<String, dynamic>> _allDocs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    if (widget.tableNames.isEmpty) return;
+    setState(() => _loading = true);
+    for (final table in widget.tableNames) {
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('project_data')
+            .doc(widget.projectId)
+            .collection(table)
+            .get();
+        for (final doc in snap.docs) {
+          final d = Map<String, dynamic>.from(doc.data());
+          d['_table'] = table;
+          d['_id']    = doc.id;
+          _allDocs.add(d);
+        }
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return [];
+    return _allDocs.where((doc) => doc.entries.any((e) =>
+      e.key != '_table' && e.key != '_id' && e.key != 'createdAt' &&
+      e.value.toString().toLowerCase().contains(q)
+    )).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final results = _filtered;
+    final primary = widget.primaryColor;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Search'),
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: TextField(
+              autofocus: true,
+              onChanged: (v) => setState(() => _query = v),
+              decoration: InputDecoration(
+                hintText: 'Search records…',
+                prefixIcon: Icon(Icons.search, color: primary),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => _query = ''))
+                    : null,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary, width: 2)),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _loading
+                ? Center(child: CircularProgressIndicator(color: primary))
+                : _query.trim().isEmpty
+                    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.search, size: 56, color: Colors.grey.shade300), const SizedBox(height: 8), Text('Type to search records', style: TextStyle(color: Colors.grey.shade500))]))
+                    : results.isEmpty
+                        ? Center(child: Text('No results for "\$_query"', style: TextStyle(color: Colors.grey.shade500)))
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            itemCount: results.length,
+                            itemBuilder: (ctx, i) {
+                              final doc = results[i];
+                              final tableName = doc['_table'] as String? ?? '';
+                              final entries = doc.entries.where((e) => e.key != '_table' && e.key != '_id' && e.key != 'createdAt').toList();
+                              final titleVal  = entries.isNotEmpty ? entries.first.value.toString() : '';
+                              final subParts  = entries.skip(1).take(2).map((e) => e.value.toString()).where((v) => v.isNotEmpty).join(' · ');
+                              final letter    = titleVal.isNotEmpty ? titleVal[0].toUpperCase() : '?';
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                child: ListTile(
+                                  leading: CircleAvatar(backgroundColor: primary, child: Text(letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                                  title: Text(titleVal, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                                    if (subParts.isNotEmpty) Text(subParts, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                    Text(tableName, style: TextStyle(color: primary, fontSize: 11, fontWeight: FontWeight.w600)),
+                                  ]),
+                                  isThreeLine: subParts.isNotEmpty,
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Stateful helper widgets ──────────────────────────────────────────────────
+
+class _CheckboxWidget extends StatefulWidget {
+  const _CheckboxWidget({required this.label, required this.activeColor});
+  final String label;
+  final Color activeColor;
+  @override
+  State<_CheckboxWidget> createState() => _CheckboxWidgetState();
+}
+class _CheckboxWidgetState extends State<_CheckboxWidget> {
+  bool _checked = false;
+  @override
+  Widget build(BuildContext context) => CheckboxListTile(
+        value: _checked,
+        onChanged: (v) => setState(() => _checked = v ?? false),
+        title: Text(widget.label),
+        activeColor: widget.activeColor,
+      );
+}
+
+class _SwitchWidget extends StatefulWidget {
+  const _SwitchWidget({required this.label, required this.activeColor});
+  final String label;
+  final Color activeColor;
+  @override
+  State<_SwitchWidget> createState() => _SwitchWidgetState();
+}
+class _SwitchWidgetState extends State<_SwitchWidget> {
+  bool _val = false;
+  @override
+  Widget build(BuildContext context) => SwitchListTile(
+        value: _val,
+        onChanged: (v) => setState(() => _val = v),
+        title: Text(widget.label),
+        activeColor: widget.activeColor,
+      );
+}
+`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Gradle & Android File Generators (Kotlin DSL / KTS)
 // ════════════════════════════════════════════════════════════════════════════════
 
 function generatePubspec(appConfig) {
-    return `name: ${sanitizePackageName(appConfig.name)}
-description: ${appConfig.description || 'Built with AppForge'}
-publish_to: 'none'
-
+    const pkgLeaf = sanitizePackageName(appConfig.name).split('.').pop();
+    return `name: ${pkgLeaf}
+description: Built with AppForge
+publish_to: none
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ^3.10.3
 
 dependencies:
   flutter:
     sdk: flutter
-  provider: ^6.1.5+1
-  go_router: ^17.2.1
-  cached_network_image: ^3.2.3
-  firebase_core: ^2.32.0
-  firebase_auth: ^4.19.0
-  cloud_firestore: ^4.17.0
-  firebase_storage: ^11.7.0
-  firebase_messaging: ^14.9.0
-  uuid: ^4.0.0
+  firebase_core: ^4.7.0
+  cloud_firestore: ^6.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
 `;
 }
 
-function generateMainDart(appConfig) {
-    const screenCount = (appConfig.screens || []).length;
-
-    return `import 'package:flutter/material.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '${appConfig.name}',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
-    );
-  }
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('${appConfig.name}'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.phone_android, size: 80, color: Colors.blue),
-            const SizedBox(height: 20),
-            const Text('App Built Successfully!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text('Screens: ${screenCount}'),
-            const SizedBox(height: 20),
-            const Text('This is a placeholder screen.\\nCustom screens from the builder', textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-}
-`;
-}
-
-function generateMainActivityKt(packageName) {
-    return `package ${packageName}
-
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity: FlutterActivity() {
-}
-`;
-}
-
-function generateGradleProperties() {
-    return `# Project-wide Gradle settings.
-# For more details on how to configure your build environment visit
-# http://www.gradle.org/guide/topics/build_environment.html.
-# Specifies the JVM arguments used for the daemon process.
-# The setting is particularly useful for headless machines. See also
-# http://www.gradle.org/guide/topics/build_environment/daemon_properties.html
-# Increase the heap size of the daemon to 2GB to avoid OutOfMemory errors
-org.gradle.jvmargs=-Xmx2048m
-
-# When configured, Gradle will run in incubating parallel mode.
-# This option should only be used with decoupled projects. See Gradle documentation for more details.
-# org.gradle.parallel=true
-org.gradle.parallel=true
-
-# Enable the new Gradle build cache feature for faster builds
-org.gradle.caching=true
-
-# Enable AndroidX
-android.useAndroidX=true
-
-# Enable Jetifier for library compatibility
-android.enableJetifier=true
-
-# Target Android API 34 with source and target compatibility 17
-android.compileSdkVersion=34
-`;
-}
-
-function generateAppBuildGradle(packageName) {
-    return `plugins {
-    id 'com.android.application'
-    id 'kotlin-android'
-}
-
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
-}
-
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
-
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null) {
-    flutterVersionCode = '1'
-}
-
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null) {
-    flutterVersionName = '1.0'
-}
-
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "\${flutterRoot}/packages/flutter_tools/gradle/flutter.gradle"
-
-android {
-    compileSdkVersion 34
-    ndkVersion flutter.ndkVersion
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11
-    }
-
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-    }
-
-    defaultConfig {
-        applicationId "${packageName}"
-        minSdkVersion 21
-        targetSdkVersion 34
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
-    }
-
-    buildTypes {
-        release {
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-}
-
-flutter {
-    source '../..'
-}
-
-dependencies {
-    implementation 'androidx.window:window:1.2.0'
-}
-`;
-}
-
-function generateProjectBuildGradle() {
-    return `buildscript {
-    ext.kotlin_version = '1.7.10'
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:7.3.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"
-    }
-}
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.buildDir = '../build'
-subprojects {
-    project.buildDir = "\${rootProject.buildDir}/\${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(':app')
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
-}
-`;
-}
-
-function generateSettingsGradle() {
+function generateSettingsGradleKts() {
+    // Note: \${...} in JS template literal → ${...} in Kotlin (string interpolation)
     return `pluginManagement {
-    def flutterSdkPath = {
-        def properties = new Properties()
-        def propertiesFile = new File(rootDir.parentFile, '.dart_tool/package_config.json')
-        if (propertiesFile.exists()) {
-            propertiesFile.withInputStream { stream ->
-                properties.load(stream)
-            }
-        }
-        properties.getProperty('flutter.sdk') ?: System.env.FLUTTER_SDK ?: System.getenv('FLUTTER_SDK')
+    val flutterSdkPath = run {
+        val properties = java.util.Properties()
+        file("local.properties").inputStream().use { properties.load(it) }
+        val flutterSdkPath = properties.getProperty("flutter.sdk")
+        require(flutterSdkPath != null) { "flutter.sdk not set in local.properties" }
+        flutterSdkPath
     }
 
-    settings.ext.flutterSdkPath = flutterSdkPath()
-
-    includeBuild("\${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
+    includeBuild("\${flutterSdkPath}/packages/flutter_tools/gradle")
 
     repositories {
         google()
@@ -801,98 +973,126 @@ function generateSettingsGradle() {
 }
 
 plugins {
-    id 'dev.flutter.flutter-gradle-plugin' version '1.0.0' apply false
+    id("dev.flutter.flutter-plugin-loader") version "1.0.0"
+    id("com.android.application") version "8.11.1" apply false
+    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
 }
 
-include ':app'
-
-def localPropertiesFile = new File(rootDir, 'local.properties')
-def properties = new Properties()
-
-if (localPropertiesFile.exists()) {
-    properties.load(localPropertiesFile.newDataInputStream())
+include(":app")
+`;
 }
 
-def flutterSdkPath = properties.getProperty('flutter.sdk')
-if (flutterSdkPath != null) {
-    System.setProperty('flutter.sdk', flutterSdkPath)
+function generateProjectBuildGradleKts() {
+    // The build directory redirection (../../build) is critical.
+    // Without it Gradle puts outputs in android/app/build/ but Flutter's CLI
+    // expects them at <projectRoot>/build/app/outputs/flutter-apk/app-release.apk
+    return `plugins {
+    id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
-def flutterNdkPath = properties.getProperty('flutter.ndk')
-if (flutterNdkPath != null) {
-    System.setProperty('flutter.ndk', flutterNdkPath)
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
+rootProject.layout.buildDirectory.value(newBuildDir)
+
+subprojects {
+    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
+    project.layout.buildDirectory.value(newSubprojectBuildDir)
+}
+
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register<Delete>("clean") {
+    delete(rootProject.layout.buildDirectory)
 }
 `;
 }
 
-function generateStylesXml() {
-    return `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Theme for the splash screen displayed before loading the Flutter UI -->
-    <style name="LaunchTheme" parent="@android:style/Theme.NoTitleBar">
-        <!-- Show a splash screen on the activity. Automatically removed when
-             the Flutter engine draws its first frame -->
-        <item name="android:windowBackground">@drawable/launch_background</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowActionBar">false</item>
-        <item name="android:windowFullscreen">false</item>
-        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
-    </style>
+function generateAppBuildGradleKts(packageName) {
+    return `plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
+}
 
-    <!-- Theme of Flutter Demo app -->
-    <style name="NormalTheme" parent="@android:style/Theme.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
-    </style>
-</resources>
+android {
+    namespace = "${packageName}"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
+    defaultConfig {
+        applicationId = "${packageName}"
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        release {
+            // Sign with debug key for now; replace with your keystore for production
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}
+
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
+    implementation("com.google.firebase:firebase-firestore")
+}
+
+flutter {
+    source = "../.."
+}
 `;
 }
 
-function generateLocalProperties() {
-    return `# Automatically generated by Flutter CLI.
-# Do not edit or check into version control.
+function generateGradleProperties() {
+    return `org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError
+org.gradle.parallel=true
+org.gradle.caching=true
+android.useAndroidX=true
+android.enableJetifier=true
 `;
 }
 
-function generateLaunchBackgroundXml() {
-    return `<?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/io_flutter_splash_screen_background" />
+function generateMainActivityKt(packageName) {
+    return `package ${packageName}
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
-</layer-list>
-`;
-}
+import io.flutter.embedding.android.FlutterActivity
 
-function generateColorsXml() {
-    return `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- The color used with the launch icon background (for API 21+) -->
-    <color name="io_flutter_splash_screen_background">#FFFFFFFF</color>
-</resources>
+class MainActivity : FlutterActivity()
 `;
 }
 
 function generateAndroidManifest(appConfig, packageName) {
     const pkg = packageName || sanitizePackageName(appConfig.name);
-
-    return `<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="${pkg}">
+    return `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:label="${appConfig.name}"
-        android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true">
-        
-        <!-- Flutter v2 embedding MainActivity -->
+
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"
@@ -901,144 +1101,97 @@ function generateAndroidManifest(appConfig, packageName) {
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize"
             android:exported="true">
-            
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Flutter v2 embedding metadata (REQUIRED) -->
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
+        <meta-data android:name="flutterEmbedding" android:value="2" />
     </application>
 </manifest>`;
 }
 
+function generateStylesXml() {
+    return `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>
+`;
+}
+
+function generateLaunchBackgroundXml() {
+    return `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+</layer-list>
+`;
+}
+
+function generateColorsXml() {
+    return `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="io_flutter_splash_screen_background">#FFFFFFFF</color>
+</resources>
+`;
+}
+
+function generateGitignore() {
+    return `.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.class
+*.log
+.DS_Store
+`;
+}
+
 function sanitizePackageName(name) {
-    return 'com.appforge.' + name
+    const leaf = String(name)
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '_')
         .replace(/_+/g, '_')
-        .substring(0, 20);
+        .replace(/^_|_$/g, '')
+        .substring(0, 20) || 'app';
+    return `com.appforge.${leaf}`;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Cleanup and Server Management
+// Server Startup & Cleanup
 // ════════════════════════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════════════════════════
-// Download Endpoint (UNIFIED)
-// ════════════════════════════════════════════════════════════════════════════════
-
-/**
- * GET /api/download/:buildId
- * Download the built APK file (PRIMARY ENDPOINT)
- */
-app.get('/api/download/:buildId', (req, res) => {
-    try {
-        const { buildId } = req.params;
-        const buildRecord = buildStates.get(buildId);
-
-        if (!buildRecord) {
-            return res.status(404).json({ error: 'Build not found' });
-        }
-
-        if (buildRecord.status !== 'complete') {
-            return res.status(400).json({
-                error: `Build not completed. Current status: ${buildRecord.status}`,
-                status: buildRecord.status
-            });
-        }
-
-        const apkPath = path.join(APKS_DIR, `${buildId}.apk`);
-
-        // Verify APK file exists and has content
-        if (!fs.existsSync(apkPath)) {
-            return res.status(404).json({ error: 'APK file not found in storage' });
-        }
-
-        const stats = fs.statSync(apkPath);
-        if (stats.size <= 0) {
-            return res.status(400).json({ error: 'APK file is empty or corrupted' });
-        }
-
-        // Set proper headers for APK download
-        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-        res.setHeader('Content-Disposition', 'attachment; filename="app-release.apk"');
-        res.setHeader('Content-Length', stats.size);
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-
-        const fileStream = fs.createReadStream(apkPath);
-        fileStream.pipe(res);
-
-        fileStream.on('error', (error) => {
-            console.error(`Download error for ${buildId}:`, error);
-            if (!res.headersSent) {
-                res.status(500).json({ error: 'Download failed' });
-            }
-        });
-
-        console.log(`📥 APK ${buildId} downloaded (${formatFileSize(stats.size)})`);
-    } catch (error) {
-        console.error('Download error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Server Startup and Cleanup
-// ════════════════════════════════════════════════════════════════════════════════
-
-// Cleanup old builds (older than 7 days)
 function cleanupOldBuilds() {
-    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    const maxAge = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
-
-    let cleanedCount = 0;
+    let count = 0;
     buildStates.forEach((record, buildId) => {
         if (record.endTime && (now - record.endTime) > maxAge) {
             buildStates.delete(buildId);
-            const buildDir = path.join(BUILDS_DIR, buildId);
-            try {
-                fs.removeSync(buildDir);
-                cleanedCount++;
-            } catch (e) {
-                console.warn(`Failed to cleanup build ${buildId}:`, e.message);
-            }
+            try { fs.removeSync(path.join(BUILDS_DIR, buildId)); count++; } catch (e) { }
         }
     });
-
-    if (cleanedCount > 0) {
-        console.log(`🧹 Cleaned up ${cleanedCount} old build(s)`);
-    }
+    if (count > 0) console.log(`🧹 Cleaned up ${count} old build(s)`);
 }
 
-// Run cleanup every 24 hours
 setInterval(cleanupOldBuilds, 24 * 60 * 60 * 1000);
-
-// Also run cleanup on startup
 cleanupOldBuilds();
 
-// Start server on all interfaces (0.0.0.0) so it's accessible from other machines
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n${'═'.repeat(60)}`);
     console.log(`🚀 APK Build Server is running!`);
     console.log(`${'═'.repeat(60)}`);
-    console.log(`\n📍 Server Address: http://0.0.0.0:${PORT}`);
-    console.log(`📍 Local Machine: http://localhost:${PORT}`);
-    console.log(`\n📂 Directories:`);
-    console.log(`   ├─ Builds: ${BUILDS_DIR}`);
-    console.log(`   ├─ Projects: ${PROJECTS_DIR}`);
-    console.log(`   ├─ APKs: ${APKS_DIR}`);
-    console.log(`   └─ Temp: ${TEMP_DIR}`);
-    console.log(`\n🔗 API Endpoints:`);
-    console.log(`   ├─ Health: GET  /health`);
-    console.log(`   ├─ Submit: POST /api/build/submit`);
-    console.log(`   ├─ Status: GET  /api/build/status/:buildId`);
-    console.log(`   └─ Download: GET  /api/download/:buildId`);
+    console.log(`\n📍 Local: http://localhost:${PORT}`);
+    console.log(`\n🔗 Endpoints:`);
+    console.log(`   GET  /health`);
+    console.log(`   POST /api/build/submit`);
+    console.log(`   GET  /api/build/status/:id`);
+    console.log(`   GET  /api/download/:id`);
     console.log(`\n${'═'.repeat(60)}\n`);
 });
 

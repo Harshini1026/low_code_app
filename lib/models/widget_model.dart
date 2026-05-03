@@ -66,6 +66,8 @@ class WidgetModel {
           'fontSize': 16.0,
           'action': 'none',
           'borderRadius': 12.0,
+          'actionTable': '',   // table name for addRecord action
+          'actionFields': '',  // comma-sep field names to collect
         },
         'text': {
           'content': 'Sample Text',
@@ -269,6 +271,21 @@ class WidgetModel {
           'showScrollIndicator': true,
           'physics': 'always',
         },
+        'iconbtn': {
+          'icon': 'favorite',
+          'color': '#00C896',
+          'iconColor': '#FFFFFF',
+          'action': 'none',
+          'actionTable': '',
+          'actionFields': '',
+        },
+        'fab': {
+          'icon': 'add',
+          'color': '#00C896',
+          'action': 'none',
+          'actionTable': '',
+          'actionFields': '',
+        },
       }[type] ??
       {};
 
@@ -300,6 +317,8 @@ class WidgetModel {
         'listtile': 72.0,
         'listview': 240.0,
         'singlechildscrollview': 200.0,
+        'iconbtn': 56.0,
+        'fab': 64.0,
       }[type] ??
       60.0;
 

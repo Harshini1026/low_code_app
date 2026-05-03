@@ -6,6 +6,7 @@ import '../models/screen_model.dart';
 import '../models/widget_model.dart';
 import '../services/firestore_service.dart';
 import '../services/project_persistence_service.dart';
+import '../services/auto_backend_detector.dart';
 
 class BuilderProvider extends ChangeNotifier {
   // ── Service instances ─────────────────────────────────────────────────
@@ -358,6 +359,85 @@ class BuilderProvider extends ChangeNotifier {
     );
     notifyListeners();
     _autosave();
+  }
+
+  /// Add a single field to an existing table
+  void addFieldToTable(String tableName, String fieldName) {
+    if (_project == null) return;
+    final cfg = _project!.backendConfig;
+    final tables = cfg.tables.map((table) {
+      if (table.name == tableName && !table.fields.contains(fieldName)) {
+        return DatabaseTable(
+          id: table.id,
+          name: table.name,
+          fields: [...table.fields, fieldName],
+        );
+      }
+      return table;
+    }).toList();
+
+    _project = _project!.copyWith(
+      backendConfig: BackendConfig(
+        tables: tables,
+        emailAuth: cfg.emailAuth,
+        googleAuth: cfg.googleAuth,
+      ),
+    );
+    notifyListeners();
+    _autosave();
+  }
+
+  /// Generate backend structure from all input widgets in current screen
+  Future<void> generateBackendFromScreen() async {
+    if (_project == null || activeScreen == null) return;
+
+    final suggestion = AutoBackendDetector.generateFromScreen(activeScreen!);
+
+    if (suggestion.fields.isEmpty) {
+      debugPrint('No input widgets found in screen');
+      return;
+    }
+
+    // Create the table with all suggested fields
+    addTable(
+      suggestion.tableName,
+      suggestion.getFieldNames(includeSystem: true),
+    );
+
+    // Auto-bind widgets to their fields if possible
+    for (final widget in suggestion.inputWidgets) {
+      final fieldName = AutoBackendDetector.suggestFieldName(widget);
+      if (fieldName.isNotEmpty) {
+        bindWidgetToData(widget.id, suggestion.tableName, fieldName);
+      }
+    }
+  }
+
+  /// Generate backend from all screens at once
+  Future<List<String>> generateBackendFromAllScreens() async {
+    if (_project == null) return [];
+
+    final suggestions = AutoBackendDetector.generateFromAllScreens(
+      _project!.screens,
+    );
+    final createdTables = <String>[];
+
+    for (final suggestion in suggestions) {
+      // Check if table already exists
+      final exists = _project!.backendConfig.tables.any(
+        (t) => t.name == suggestion.tableName,
+      );
+
+      if (!exists) {
+        addTable(
+          suggestion.tableName,
+          suggestion.getFieldNames(includeSystem: true),
+        );
+        createdTables.add(suggestion.tableName);
+      }
+    }
+
+    return createdTables;
   }
 
   void undo() {
