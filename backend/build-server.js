@@ -516,7 +516,7 @@ function generateMainDart(appConfig) {
                     const table = esc(w.boundTable);
                     const primaryC = hexColor('#' + rawPrimaryColor);
                     // Live Firestore stream with name/avatar ListTile layout
-                    return `SizedBox(height: 300, child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('project_data').doc('${esc(projectId)}').collection('${table}').orderBy('createdAt', descending: true).snapshots(), builder: (ctx, snap) { if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator()); if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text('No records yet', style: const TextStyle(color: Colors.grey))); final docs = snap.data!.docs; return ListView.builder(itemCount: docs.length, shrinkWrap: true, itemBuilder: (ctx, i) { final data = Map<String, dynamic>.from(docs[i].data() as Map); data.remove('createdAt'); final entries = data.entries.toList(); final titleVal = entries.isNotEmpty ? entries.first.value.toString() : ''; final subtitleVal = entries.skip(1).take(2).map((e) => e.value.toString()).where((v) => v.isNotEmpty).join(' · '); final letter = titleVal.isNotEmpty ? titleVal[0].toUpperCase() : '?'; return ListTile(leading: CircleAvatar(backgroundColor: const ${primaryC}, child: Text(letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))), title: Text(titleVal, style: const TextStyle(fontWeight: FontWeight.w600)), subtitle: subtitleVal.isNotEmpty ? Text(subtitleVal, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)) : null); }); }))`;
+                    return `SizedBox(height: 300, child: StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('project_data').doc('${esc(projectId)}').collection('${table}').orderBy('createdAt', descending: true).snapshots(), builder: (ctx, snap) { if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator()); if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text('No records yet', style: const TextStyle(color: Colors.grey))); final docs = snap.data!.docs; return ListView.builder(itemCount: docs.length, shrinkWrap: true, itemBuilder: (ctx, i) { final data = Map<String, dynamic>.from(docs[i].data() as Map); data.remove('createdAt'); data.remove('id'); final allKeys = data.keys.toList(); final nameKey = allKeys.contains('name') ? 'name' : (allKeys.isNotEmpty ? allKeys.first : null); final titleVal = nameKey != null ? (data[nameKey]?.toString() ?? '') : ''; final subKeys = allKeys.where((k) => k != nameKey).take(2).toList(); final subtitleVal = subKeys.map((k) => data[k]?.toString() ?? '').where((v) => v.isNotEmpty).join(' · '); final letter = titleVal.isNotEmpty ? titleVal[0].toUpperCase() : '?'; return ListTile(leading: CircleAvatar(backgroundColor: const ${primaryC}, child: Text(letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))), title: Text(titleVal, style: const TextStyle(fontWeight: FontWeight.w600)), subtitle: subtitleVal.isNotEmpty ? Text(subtitleVal, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)) : null); }); }))`;
                 }
                 const items = String(p.items || '').split(',').map(i => i.trim()).filter(Boolean);
                 const textColor = hexColor(p.textColor || '#000000');
@@ -578,13 +578,14 @@ function generateMainDart(appConfig) {
         const controllerDecls = inputIds.map(id => `  final TextEditingController _ctrl_${dartId(id)} = TextEditingController();`).join('\n');
         const controllerDispose = inputIds.map(id => `    _ctrl_${dartId(id)}.dispose();`).join('\n');
 
-        // AppBar — always include search icon that navigates to /search
+        // AppBar — always present with search icon; uses widget props if placed, else falls back to defaults
         let appBarCode = '';
-        if (appbarWidget) {
-            const ap = appbarWidget.properties || {};
-            const bgC = hexColor(ap.color || '#00C896');
+        {
+            const ap = (appbarWidget || {}).properties || {};
+            const bgC = hexColor(ap.color || '#' + rawPrimaryColor);
             const fgC = hexColor(ap.textColor || '#FFFFFF');
-            appBarCode = `appBar: AppBar(title: Text('${esc(ap.title || screen.name)}'), backgroundColor: const ${bgC}, foregroundColor: const ${fgC}, actions: [IconButton(icon: const Icon(Icons.search), onPressed: () => Navigator.pushNamed(context, '/search'), tooltip: 'Search')]),`;
+            const title = esc(ap.title || screen.name);
+            appBarCode = `appBar: AppBar(title: Text('${title}'), backgroundColor: const ${bgC}, foregroundColor: const ${fgC}, actions: [IconButton(icon: const Icon(Icons.search), onPressed: () => Navigator.pushNamed(context, '/search'), tooltip: 'Search')]),`;
         }
 
         // BottomNavigationBar
@@ -807,10 +808,14 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Map<String, dynamic>> get _filtered {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return [];
-    return _allDocs.where((doc) => doc.entries.any((e) =>
-      e.key != '_table' && e.key != '_id' && e.key != 'createdAt' &&
-      e.value.toString().toLowerCase().contains(q)
-    )).toList();
+    return _allDocs.where((doc) {
+      final nameVal = (doc['name'] ?? doc.entries
+          .where((e) => e.key != '_table' && e.key != '_id' && e.key != 'createdAt')
+          .map((e) => e.value)
+          .firstOrNull)
+          ?.toString().toLowerCase() ?? '';
+      return nameVal.contains(q);
+    }).toList();
   }
 
   @override
@@ -856,10 +861,12 @@ class _SearchScreenState extends State<SearchScreen> {
                             itemBuilder: (ctx, i) {
                               final doc = results[i];
                               final tableName = doc['_table'] as String? ?? '';
-                              final entries = doc.entries.where((e) => e.key != '_table' && e.key != '_id' && e.key != 'createdAt').toList();
-                              final titleVal  = entries.isNotEmpty ? entries.first.value.toString() : '';
-                              final subParts  = entries.skip(1).take(2).map((e) => e.value.toString()).where((v) => v.isNotEmpty).join(' · ');
-                              final letter    = titleVal.isNotEmpty ? titleVal[0].toUpperCase() : '?';
+                              final allKeys = doc.keys.where((k) => k != '_table' && k != '_id' && k != 'createdAt').toList();
+                              final nameKey = allKeys.contains('name') ? 'name' : (allKeys.isNotEmpty ? allKeys.first : null);
+                              final titleVal = nameKey != null ? (doc[nameKey]?.toString() ?? '') : '';
+                              final subKeys = allKeys.where((k) => k != nameKey).take(2).toList();
+                              final subParts = subKeys.map((k) => doc[k]?.toString() ?? '').where((v) => v.isNotEmpty).join(' · ');
+                              final letter = titleVal.isNotEmpty ? titleVal[0].toUpperCase() : '?';
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

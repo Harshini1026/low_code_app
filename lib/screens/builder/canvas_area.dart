@@ -947,11 +947,7 @@ class WidgetRenderer extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: [
-                if (props['showBack'] == 'true')
-                  const Icon(Icons.arrow_back, color: Colors.white, size: 20)
-                else
-                  const Icon(Icons.menu, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     _s(props, 'title', 'Screen Title'),
@@ -964,14 +960,8 @@ class WidgetRenderer extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.search, color: Colors.white),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
-                  onPressed: () {},
-                ),
+                const Icon(Icons.search, color: Colors.white, size: 22),
+                const SizedBox(width: 10),
               ],
             ),
           ),

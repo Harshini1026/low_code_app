@@ -139,13 +139,13 @@ class PropertiesPanel extends StatelessWidget {
                       letterSpacing: 1,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _ActionBtn(
-                    Icons.link,
-                    'Bind to Database',
-                    AppTheme.secondary,
-                    onBindData,
-                  ),
+                  // const SizedBox(height: 8),
+                  // _ActionBtn(
+                  //   Icons.link,
+                  //   'Bind to Database',
+                  //   AppTheme.secondary,
+                  //   onBindData,
+                  // ),
                   const SizedBox(height: 6),
                   _ActionBtn(
                     Icons.copy,
@@ -241,9 +241,7 @@ class PropertiesPanel extends StatelessWidget {
               orElse: () => tables.first,
             );
             final fieldOptions = selectedTable.fields
-                .where(
-                  (f) => !['id', 'created_at', 'updated_at'].contains(f),
-                )
+                .where((f) => !['id', 'created_at', 'updated_at'].contains(f))
                 .toList();
             if (fieldOptions.isNotEmpty) {
               final selectedFields =
@@ -698,9 +696,7 @@ class PropertiesPanel extends StatelessWidget {
               orElse: () => tables.first,
             );
             final fieldOptions = selectedTable.fields
-                .where(
-                  (f) => !['id', 'created_at', 'updated_at'].contains(f),
-                )
+                .where((f) => !['id', 'created_at', 'updated_at'].contains(f))
                 .toList();
             if (fieldOptions.isNotEmpty) {
               final selectedFields =
@@ -773,9 +769,7 @@ class PropertiesPanel extends StatelessWidget {
               orElse: () => tables.first,
             );
             final fieldOptions = selectedTable.fields
-                .where(
-                  (f) => !['id', 'created_at', 'updated_at'].contains(f),
-                )
+                .where((f) => !['id', 'created_at', 'updated_at'].contains(f))
                 .toList();
             if (fieldOptions.isNotEmpty) {
               final selectedFields =
@@ -1928,15 +1922,12 @@ class _SourceTableRow extends StatelessWidget {
                 decoration: const InputDecoration(
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(
-                    horizontal: 10,
+                    horizontal: 5,
                     vertical: 8,
                   ),
                 ),
                 items: tables.map((t) {
-                  return DropdownMenuItem(
-                    value: t.name,
-                    child: Text(t.name),
-                  );
+                  return DropdownMenuItem(value: t.name, child: Text(t.name));
                 }).toList(),
                 onChanged: (v) {
                   if (v != null) onChanged(v);
@@ -1958,11 +1949,15 @@ class _SourceTableRow extends StatelessWidget {
             children: [
               const Icon(Icons.link, size: 12, color: AppTheme.secondary),
               const SizedBox(width: 4),
-              Text(
-                'Will show records from "$currentTable" in installed app',
-                style: const TextStyle(
-                  color: AppTheme.secondary,
-                  fontSize: 10,
+              SizedBox(
+                width: 180,
+                child: Text(
+                  'Will show records from "$currentTable" in installed app',
+                  maxLines: 2,
+                  style: const TextStyle(
+                    color: AppTheme.secondary,
+                    fontSize: 10,
+                  ),
                 ),
               ),
             ],
@@ -2029,9 +2024,7 @@ class _FieldChipSelector extends StatelessWidget {
                 style: TextStyle(
                   color: isSelected ? AppTheme.primary : AppTheme.textMuted,
                   fontSize: 11,
-                  fontWeight: isSelected
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ),
@@ -2164,9 +2157,7 @@ class _IconPickerRowState extends State<_IconPickerRow> {
                         ? AppTheme.primary.withOpacity(0.2)
                         : Colors.transparent,
                     border: Border.all(
-                      color: selected
-                          ? AppTheme.primary
-                          : AppTheme.darkBorder,
+                      color: selected ? AppTheme.primary : AppTheme.darkBorder,
                     ),
                     borderRadius: BorderRadius.circular(6),
                   ),
