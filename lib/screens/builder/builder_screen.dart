@@ -128,9 +128,18 @@ class _BuilderScreenState extends State<BuilderScreen> {
                 onUndo: provider.canUndo ? provider.undo : null,
                 onTogglePreview: _togglePreviewMode,
                 onSetPreviewOrientation: _setPreviewOrientation,
-                onPreview: () => context.go('/preview/${widget.projectId}'),
-                onPublish: () => context.go('/publish/${widget.projectId}'),
-                onBack: () => context.go('/home'),
+                onPreview: () async {
+                  await provider.saveCurrentProject();
+                  if (mounted) context.go('/preview/${widget.projectId}');
+                },
+                onPublish: () async {
+                  await provider.saveCurrentProject();
+                  if (mounted) context.go('/publish/${widget.projectId}');
+                },
+                onBack: () async {
+                  await provider.saveCurrentProject();
+                  if (mounted) context.go('/home');
+                },
               ),
 
               // ── Body: Preview Mode or Normal Builder ───────────────────────

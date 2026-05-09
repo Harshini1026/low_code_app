@@ -71,32 +71,59 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
     if (confirmed != true || !mounted) return;
 
     final user = context.read<AuthProvider>().user;
-    if (user == null) return;
+    if (user == null) {
+      debugPrint('⚠️ Template: User not authenticated');
+      return;
+    }
 
     setState(() => _creating = true);
     try {
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('🎨 CREATING PROJECT FROM TEMPLATE: ${template.name}');
+      debugPrint('   User ID: ${user.uid}');
+      debugPrint('   User Email: ${user.email}'); // ✅ FIX 1: Debug log
+      
       final projectId = await FirestoreService().createFromTemplate(
-        template, user.uid,
+        template,
+        user.uid,
         nameCtrl.text.trim().isEmpty ? '${template.name} App' : nameCtrl.text.trim(),
+        user.email, // ✅ FIX 1: Pass email when creating project
       );
 
-      // ✅ FIX 6: Save the new project to local persistence immediately
+      debugPrint('✅ Project created in Firebase: $projectId');
+
+      // ✅ FIX: Save the new project to local persistence immediately
       if (mounted) {
+        debugPrint('📥 Loading project to verify userId...');
+        
         // Load it first to get the full project data
         final builder = context.read<BuilderProvider>();
         await builder.loadProject(projectId);
         final newProject = builder.project;
         
         if (newProject != null) {
-          // Save to local storage
+          debugPrint('✅ Project loaded: ${newProject.name}');
+          debugPrint('   Project userId:  ${newProject.userId}');
+          debugPrint('   Current user:    ${user.uid}');
+          
+          if (newProject.userId != user.uid) {
+            debugPrint('⚠️ WARNING: Project userId mismatch!');
+          }
+          
+          // Save to local storage for offline access
           final persistence = ProjectPersistenceService();
           await persistence.init();
           await persistence.saveProjectImmediately(newProject);
+          debugPrint('✅ Project saved to local cache');
+        } else {
+          debugPrint('❌ Failed to load project after creation');
         }
       }
 
+      debugPrint('═══════════════════════════════════════════════════════════');
       if (mounted) context.go('/builder/$projectId');
     } catch (e) {
+      debugPrint('❌ Error creating project: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.accent),

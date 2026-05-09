@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 import '../models/project_model.dart';
 import '../models/template_model.dart';
 
@@ -8,7 +9,7 @@ class FirestoreService {
   final _uuid = const Uuid();
 
   // ── Collections ───────────────────────────────────────────────────────────
-  CollectionReference get _users    => _db.collection('users');
+  CollectionReference get _users => _db.collection('users');
   CollectionReference get _projects => _db.collection('projects');
 
   // ── Get all projects for a user (real-time stream) ────────────────────────
@@ -17,9 +18,10 @@ class FirestoreService {
         .where('userId', isEqualTo: userId)
         .orderBy('updatedAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => ProjectModel.fromFirestore(doc))
-            .toList());
+        .map(
+          (snap) =>
+              snap.docs.map((doc) => ProjectModel.fromFirestore(doc)).toList(),
+        );
   }
 
   // ── Get a single project ──────────────────────────────────────────────────
@@ -34,29 +36,39 @@ class FirestoreService {
     TemplateModel template,
     String userId,
     String projectName,
+    String? userEmail,
   ) async {
     final projectId = _uuid.v4();
     final now = FieldValue.serverTimestamp();
- 
+
     // Build default screens with empty widget lists
-    final screens = template.defaultScreens.map((name) => {
-      'id': _uuid.v4(),
-      'name': name,
-      'widgets': <Map>[],
-      'backgroundColor': '#FFFFFF',
-    }).toList();
+    final screens = template.defaultScreens
+        .map(
+          (name) => {
+            'id': _uuid.v4(),
+            'name': name,
+            'widgets': <Map>[],
+            'backgroundColor': '#FFFFFF',
+          },
+        )
+        .toList();
 
     // Build default tables
-    final tables = template.defaultTables.map((t) => {
-      'id': _uuid.v4(),
-      'name': t.name,
-      'fields': ['id', 'created_at', ...t.fields],
-    }).toList();
+    final tables = template.defaultTables
+        .map(
+          (t) => {
+            'id': _uuid.v4(),
+            'name': t.name,
+            'fields': ['id', 'created_at', ...t.fields],
+          },
+        )
+        .toList();
 
     await _projects.doc(projectId).set({
       'id': projectId,
       'name': projectName,
       'userId': userId,
+      'userEmail': userEmail, // ✅ FIX 1: Store user email
       'templateId': template.id,
       'templateName': template.name,
       'status': 'draft',
@@ -82,19 +94,33 @@ class FirestoreService {
     });
 
     // Increment user project count
-    await _users.doc(userId).update({
-      'projectCount': FieldValue.increment(1),
-    }).catchError((_) {}); // ignore if user doc doesn't exist yet
+    await _users
+        .doc(userId)
+        .update({'projectCount': FieldValue.increment(1)})
+        .catchError((_) {}); // ignore if user doc doesn't exist yet
 
     return projectId;
   }
 
   // ── Save / update a project ───────────────────────────────────────────────
   Future<void> updateProject(ProjectModel project) async {
-    await _projects.doc(project.id).update({
-      ...project.toFirestore(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('🔄 STEP 2 - BACKEND FIREBASE UPDATE');
+    debugPrint('   Project: ${project.name}');
+    debugPrint('   Project ID: ${project.id}');
+    debugPrint('   User ID: ${project.userId}');
+    debugPrint('   SAVE EMAIL: ${project.userEmail ?? "NOT SET"}');
+
+    final data = project.toFirestore();
+    data['updatedAt'] = FieldValue.serverTimestamp();
+
+    debugPrint('   Updating Firestore with:');
+    debugPrint('     - userEmail: ${data['userEmail']}');
+    debugPrint('     - userId: ${data['userId']}');
+
+    await _projects.doc(project.id).update(data);
+    debugPrint('✅ STEP 2: Firebase document updated');
+    debugPrint('═══════════════════════════════════════════════════════════');
   }
 
   // ── Publish a project ─────────────────────────────────────────────────────
@@ -118,12 +144,16 @@ class FirestoreService {
     await _projects.doc(projectId).delete();
 
     // Decrement user project count (floor at 0)
-    await _users.doc(userId).update({
-      'projectCount': FieldValue.increment(-1),
-    }).catchError((_) {});
+    await _users
+        .doc(userId)
+        .update({'projectCount': FieldValue.increment(-1)})
+        .catchError((_) {});
 
     // Remove from user_apps if published
-    await _db.collection('user_apps').doc(projectId).delete()
+    await _db
+        .collection('user_apps')
+        .doc(projectId)
+        .delete()
         .catchError((_) {});
   }
 
@@ -132,9 +162,9 @@ class FirestoreService {
     final original = await getProject(projectId);
     if (original == null) throw Exception('Project not found');
 
-    final newId  = _uuid.v4();
-    final data   = original.toFirestore();
-    data['id']   = newId;
+    final newId = _uuid.v4();
+    final data = original.toFirestore();
+    data['id'] = newId;
     data['name'] = '${original.name} (Copy)';
     data['status'] = 'draft';
     data['publishedUrl'] = '';
@@ -142,7 +172,9 @@ class FirestoreService {
     data['updatedAt'] = FieldValue.serverTimestamp();
 
     await _projects.doc(newId).set(data);
-    await _users.doc(userId).update({'projectCount': FieldValue.increment(1)})
+    await _users
+        .doc(userId)
+        .update({'projectCount': FieldValue.increment(1)})
         .catchError((_) {});
 
     return newId;
@@ -156,7 +188,10 @@ class FirestoreService {
   }
 
   // ── Update user profile ───────────────────────────────────────────────────
-  Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
+  Future<void> updateUserProfile(
+    String userId,
+    Map<String, dynamic> data,
+  ) async {
     await _users.doc(userId).update({
       ...data,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -174,10 +209,7 @@ class FirestoreService {
         .collection('project_data')
         .doc(projectId)
         .collection(tableName)
-        .add({
-          ...data,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        .add({...data, 'createdAt': FieldValue.serverTimestamp()});
   }
 
   // ── Runtime data: stream records from a project table ─────────────────────

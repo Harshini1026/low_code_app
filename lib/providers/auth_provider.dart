@@ -66,6 +66,19 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = null;
     try {
       await _authService.signIn(email, password);
+      // ✅ STEP 7: Log email for comparison
+      if (_user != null) {
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        debugPrint('✅ STEP 7 - LOGIN: SUCCESS');
+        debugPrint('   LOGIN EMAIL: ${_user!.email}');
+        debugPrint('   User ID: ${_user!.uid}');
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        // Projects will be loaded by HomeScreen on navigation
+      }
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
@@ -80,6 +93,19 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = null;
     try {
       await _authService.signUp(email, password, name);
+      // ✅ FIX 1 & 8: Log email and load user's projects immediately after signup
+      if (_user != null) {
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        debugPrint('✅ SIGNUP SUCCESS');
+        debugPrint('   LOGIN EMAIL: ${_user!.email}');
+        debugPrint('   User ID: ${_user!.uid}');
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        // Projects will be loaded by HomeScreen on navigation
+      }
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
@@ -94,6 +120,19 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = null;
     try {
       await _authService.signInWithGoogle();
+      // ✅ FIX 1 & 8: Log email and load user's projects immediately after Google sign-in
+      if (_user != null) {
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        debugPrint('✅ GOOGLE SIGNIN SUCCESS');
+        debugPrint('   LOGIN EMAIL: ${_user!.email}');
+        debugPrint('   User ID: ${_user!.uid}');
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        // Projects will be loaded by HomeScreen on navigation
+      }
       return true;
     } catch (e) {
       _errorMessage = 'Google sign-in failed';
@@ -109,9 +148,19 @@ class AuthProvider extends ChangeNotifier {
 
   // ── Sign out ───────────────────────────────────────────────────────────────
   Future<void> signOut() async {
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('🚪 SIGNING OUT USER');
+    debugPrint('═══════════════════════════════════════════════════════════');
+
+    // ✅ NOTE: We intentionally do NOT delete projects from storage
+    // Projects belong to the user and should persist in cache
+    // Next login will reload them from Firebase
     await _authService.signOut();
     _userRole = 'user';
     _roleLoaded = false;
+
+    debugPrint('✅ LOGOUT: Complete. Projects remain safe in local cache');
+    debugPrint('═══════════════════════════════════════════════════════════');
     notifyListeners();
   }
 

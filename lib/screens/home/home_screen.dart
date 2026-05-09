@@ -20,15 +20,58 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // ✅ FIX 3 & 4: LOAD PROJECTS ONLY ONCE - Prevent multiple rebuild fetches
     _loadProjects();
   }
 
   Future<void> _loadProjects() async {
-    final auth = context.read<AuthProvider>();
-    final userId = auth.user?.uid;
-    if (userId != null) {
-      final builder = context.read<BuilderProvider>();
-      await builder.loadAllProjects(userId);
+    try {
+      final auth = context.read<AuthProvider>();
+      final userId = auth.user?.uid;
+      final userEmail = auth.user?.email;
+
+      if (userId != null) {
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        debugPrint('🏠 STEP 5 - DASHBOARD: Loading projects');
+        debugPrint('   userId=$userId');
+        debugPrint('   LOGIN EMAIL: $userEmail');
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+
+        final builder = context.read<BuilderProvider>();
+
+        // ✅ FIX 3 & 4: Check if already loaded to prevent multiple fetches
+        if (!builder.projectsLoaded) {
+          print('⏳ Starting project load (projectsLoaded=false)');
+          // ✅ FIX 6 & 7 & 8: Explicitly load projects from Firebase (with local fallback)
+          await builder.loadAllProjects(userId);
+          print('✅ Calling markProjectsAsLoaded()');
+          builder.markProjectsAsLoaded();
+          print(
+            '✅ Projects loaded and flag set, allProjects.length=${builder.allProjects.length}',
+          );
+        } else {
+          print('⏩ Projects already loaded, skipping (projectsLoaded=true)');
+        }
+
+        debugPrint('   Count: ${builder.allProjects.length}');
+        for (var proj in builder.allProjects) {
+          debugPrint(
+            '   📦 ${proj.name} (${proj.status}) - email=${proj.userEmail ?? "NOT SET"}',
+          );
+        }
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+      } else {
+        debugPrint('⚠️ STEP 5: User not authenticated');
+      }
+    } catch (e) {
+      debugPrint('❌ STEP 5: Failed to load projects: $e');
+      print('❌ STEP 5 ERROR: $e');
     }
   }
 
@@ -38,6 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = auth.user;
     final builder = context.watch<BuilderProvider>();
     final projects = builder.allProjects;
+
+    print('[SCREEN-RENDER] HomeScreen.build() called');
+    print('[SCREEN-RENDER]   - user: ${user?.email}');
+    print('[SCREEN-RENDER]   - projects in provider: ${projects.length}');
+    print('[SCREEN-RENDER]   - projectsLoaded flag: ${builder.projectsLoaded}');
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
@@ -101,6 +149,20 @@ class _HomeScreenState extends State<HomeScreen> {
           final displayProjects = projects.isNotEmpty
               ? projects
               : (snapshot.data ?? []);
+
+          print('[STREAM-RENDER] StreamBuilder builder called');
+          print(
+            '[STREAM-RENDER]   - projects from provider: ${projects.length}',
+          );
+          print(
+            '[STREAM-RENDER]   - snapshot.data: ${snapshot.data?.length ?? 0}',
+          );
+          print(
+            '[STREAM-RENDER]   - snapshot.connectionState: ${snapshot.connectionState}',
+          );
+          print(
+            '[STREAM-RENDER]   - displayProjects: ${displayProjects.length}',
+          );
 
           return CustomScrollView(
             slivers: [

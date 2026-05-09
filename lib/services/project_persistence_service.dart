@@ -35,7 +35,7 @@ class ProjectPersistenceService {
     }
   }
 
-  /// Save project with debouncing
+  /// Save project with debouncing (2 seconds)
   /// Call this on every change (drag, edit, delete)
   /// Actual save will be debounced to avoid excessive writes
   void debouncedSaveProject(ProjectModel project) {
@@ -63,20 +63,31 @@ class ProjectPersistenceService {
   /// Internal method: Actually save the project to both local and Firebase
   Future<void> _saveProjectNow(ProjectModel project) async {
     try {
+      // ✅ STEP 1: Log email for debugging
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('🔄 STEP 1 - SAVE API CALLED');
+      debugPrint('   Project name:    ${project.name}');
+      debugPrint('   Project id:      ${project.id}');
+      debugPrint('   User id:         ${project.userId}');
+      debugPrint('   SAVE EMAIL:      ${project.userEmail ?? "NOT SET"}');
+      debugPrint('═══════════════════════════════════════════════════════════');
+
       // 1. Save to local storage (always succeeds)
       await _saveToLocal(project);
 
       // 2. Try to save to Firebase
       try {
         await _fs.updateProject(project);
-        debugPrint('✅ Auto-saved project: ${project.name}');
+        debugPrint('✅ SAVE STEP: Firebase updated successfully');
+        debugPrint('   Email saved:     ${project.userEmail}');
+        debugPrint('   UserId saved:    ${project.userId}');
       } catch (e) {
         // Offline or network error - local save is still valid
-        debugPrint('⚠️ Firebase save failed (offline?): $e');
+        debugPrint('❌ SAVE STEP: Firebase update failed: $e');
         // Project is safe in local storage, will sync when online
       }
     } catch (e) {
-      debugPrint('❌ Failed to save project: $e');
+      debugPrint('❌ SAVE STEP: Critical save error: $e');
     }
   }
 
@@ -87,7 +98,7 @@ class ProjectPersistenceService {
     try {
       final key = '${project.userId}:${project.id}';
       _projectsBox?.put(key, jsonEncode(project.toJson()));
-      debugPrint('✅ Local save successful: ${project.name}');
+      debugPrint('✅ Local save: ${project.name} (${project.userEmail})');
     } catch (e) {
       debugPrint(
         '❌ Local save failed: Converting object to an encodable object failed: $e',
@@ -99,12 +110,41 @@ class ProjectPersistenceService {
   /// Load project from Firestore (with local fallback)
   Future<ProjectModel?> loadProject(String projectId, String userId) async {
     try {
-      // Try Firebase first
-      return await _fs.getProject(projectId);
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('📥 STEP 4 - FETCH API: Load single project');
+      debugPrint('   projectId: $projectId');
+      debugPrint('   userId:    $userId');
+
+      // Try Firebase first (source of truth)
+      try {
+        final project = await _fs.getProject(projectId);
+        if (project != null) {
+          debugPrint('✅ STEP 4: Loaded from Firebase');
+          debugPrint('   Project: ${project.name}');
+          debugPrint('   FETCH EMAIL: ${project.userEmail ?? "NOT SET"}');
+          debugPrint('   User ID: ${project.userId}');
+          // Cache it locally for offline access
+          await _saveToLocal(project);
+          return project;
+        }
+      } catch (e) {
+        debugPrint('⚠️ STEP 4: Firebase load failed: $e');
+      }
+
+      // Fallback to local storage if Firebase failed
+      final local = _loadFromLocal(projectId, userId);
+      if (local != null) {
+        debugPrint('✅ STEP 4: Loaded from local cache');
+        debugPrint('   Project: ${local.name}');
+        debugPrint('   FETCH EMAIL: ${local.userEmail ?? "NOT SET"}');
+      } else {
+        debugPrint('❌ STEP 4: Project not found anywhere');
+      }
+      debugPrint('═══════════════════════════════════════════════════════════');
+      return local;
     } catch (e) {
-      debugPrint('⚠️ Firebase load failed, trying local: $e');
-      // Fallback to local storage
-      return _loadFromLocal(projectId, userId);
+      debugPrint('❌ STEP 4: Critical error loading project: $e');
+      return null;
     }
   }
 
@@ -130,6 +170,7 @@ class ProjectPersistenceService {
       id: map['id'] ?? '',
       name: map['name'] ?? 'Untitled',
       userId: map['userId'] ?? '',
+      userEmail: map['userEmail'], // ✅ FIX 1: Load email from local storage
       templateId: map['templateId'] ?? 'blank',
       templateName: map['templateName'] ?? '',
       screens: (map['screens'] as List? ?? [])
@@ -160,19 +201,37 @@ class ProjectPersistenceService {
   Future<List<ProjectModel>> getCachedUserProjects(String userId) async {
     if (_projectsBox == null) await init();
     try {
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('📥 STEP 4 - FETCH: Load cached projects');
+      debugPrint('   userId: $userId');
+
       final projects = <ProjectModel>[];
+      int foundCount = 0;
+
       for (var key in _projectsBox?.keys ?? []) {
         if (key.toString().startsWith('$userId:')) {
           final data = _projectsBox?.get(key);
           if (data != null) {
-            final decoded = jsonDecode(data) as Map<String, dynamic>;
-            projects.add(_projectFromMap(decoded));
+            try {
+              final decoded = jsonDecode(data) as Map<String, dynamic>;
+              final project = _projectFromMap(decoded);
+              projects.add(project);
+              foundCount++;
+              debugPrint(
+                '   ✅ Cached: ${project.name} (email=${project.userEmail})',
+              );
+            } catch (e) {
+              debugPrint('   ⚠️ Parse error: $e');
+            }
           }
         }
       }
+
+      debugPrint('✅ STEP 4: Loaded $foundCount projects from cache');
+      debugPrint('═══════════════════════════════════════════════════════════');
       return projects;
     } catch (e) {
-      debugPrint('❌ Failed to get cached projects: $e');
+      debugPrint('❌ STEP 4: Failed to get cached projects: $e');
       return [];
     }
   }
@@ -180,6 +239,8 @@ class ProjectPersistenceService {
   /// Delete project from both local and Firebase
   Future<void> deleteProject(String projectId, String userId) async {
     try {
+      debugPrint('🗑️ Deleting project: $projectId');
+
       // Delete from Firestore
       await _fs.deleteProject(projectId, userId);
 
@@ -196,6 +257,7 @@ class ProjectPersistenceService {
 
   /// Clear pending saves on logout or cleanup
   void cancelPendingSaves() {
+    debugPrint('🛑 Cancelling pending saves');
     _debounceTimer?.cancel();
     _pendingProject = null;
   }

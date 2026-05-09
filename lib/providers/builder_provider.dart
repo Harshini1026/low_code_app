@@ -24,6 +24,7 @@ class BuilderProvider extends ChangeNotifier {
   final List<ProjectModel> _history = [];
   List<ProjectModel> _allProjects = [];
   String? _currentActiveProjectId;
+  bool _projectsLoaded = false; // ✅ FIX 3: Prevent multiple reloads
 
   // ── Public getters (declare AFTER all fields) ───────────────────────────
   bool get canUndo => _history.isNotEmpty;
@@ -40,14 +41,28 @@ class BuilderProvider extends ChangeNotifier {
   List<ProjectModel> get allProjects => _allProjects;
   String? get currentActiveProjectId => _currentActiveProjectId;
   List<WidgetModel> get currentWidgets => activeScreen?.widgets ?? [];
+  bool get projectsLoaded =>
+      _projectsLoaded; // ✅ FIX 3: Getter for single-load flag
+
+  // ✅ FIX 3: Setter for single-load flag
+  void markProjectsAsLoaded() {
+    _projectsLoaded = true;
+  }
 
   Future<void> loadProject(String id) async {
     try {
       _isLoading = true;
+      debugPrint('📥 LOADING PROJECT: id=$id');
       notifyListeners();
 
       // ✅ FIX: Get userId from current Firebase user
       final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final userEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('🔐 STEP 6 & 7 - EMAIL VERIFICATION');
+      debugPrint('   LOGIN EMAIL:     $userEmail');
+      debugPrint('   Current User ID: $userId');
+      debugPrint('═══════════════════════════════════════════════════════════');
 
       // ✅ FIX: Try persistence service first (local + Firebase fallback)
       ProjectModel? loaded =
@@ -56,9 +71,42 @@ class BuilderProvider extends ChangeNotifier {
 
       // ✅ PREVENT EMPTY OVERWRITE: Only set if project loaded successfully
       if (loaded != null) {
+        debugPrint('✅ PROJECT LOADED: ${loaded.name} (${loaded.status})');
+
+        // ✅ STEP 6 & 7 - VERIFY EMAIL CONSISTENCY
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+        debugPrint('🔐 STEP 6 & 7 - EMAIL MATCH CHECK');
+        debugPrint('   LOGIN EMAIL:      $userEmail');
+        debugPrint('   PROJECT EMAIL:    ${loaded.userEmail ?? "NOT SET"}');
+        debugPrint(
+          '   Email Match:      ${userEmail == loaded.userEmail ? "✅ YES" : "❌ NO"}',
+        );
+        debugPrint('   LOGIN USER ID:    $userId');
+        debugPrint('   PROJECT USER ID:  ${loaded.userId}');
+        debugPrint(
+          '   UserId Match:     ${userId == loaded.userId ? "✅ YES" : "❌ NO"}',
+        );
+        debugPrint(
+          '═══════════════════════════════════════════════════════════',
+        );
+
         _project = loaded;
         _currentActiveProjectId = loaded.id;
         _activeScreen = 0;
+
+        // ✅ WARN if mismatch
+        if (loaded.userId != userId) {
+          debugPrint(
+            '⚠️ WARNING: userId mismatch! Project may not sync correctly',
+          );
+        }
+        if (loaded.userEmail != userEmail) {
+          debugPrint(
+            '⚠️ WARNING: email mismatch! Expected $userEmail, got ${loaded.userEmail}',
+          );
+        }
       } else {
         debugPrint('⚠️ Project failed to load: $id');
         _project = null;
@@ -74,15 +122,114 @@ class BuilderProvider extends ChangeNotifier {
     }
   }
 
-  /// Load all projects for current user (from local cache)
+  /// Load all projects for current user (from Firebase with local fallback)
+  /// This method:
+  /// 1. First tries to load from Firebase (source of truth)
+  /// 2. Falls back to local Hive cache if offline
+  /// 3. Caches Firebase results in Hive for offline access
   Future<void> loadAllProjects(String userId) async {
     try {
-      _allProjects = await _persistence.getCachedUserProjects(userId);
+      final userEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('📦 STEP 3-4: BUILDER LOADING ALL PROJECTS');
+      debugPrint('   userId: $userId');
+      debugPrint('   LOGIN EMAIL: $userEmail');
+      debugPrint('   BEFORE FETCH: ${_allProjects.length} projects in memory');
+      debugPrint('═══════════════════════════════════════════════════════════');
+
+      // ✅ Verify current user matches requested user ID
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser?.uid != userId) {
+        debugPrint(
+          '⚠️ WARNING: Requested userId $userId != current user ${currentUser?.uid}',
+        );
+      }
+
+      List<ProjectModel> projects = [];
+
+      // Try to fetch from Firebase first (source of truth)
+      try {
+        debugPrint('   Fetching from Firebase...');
+        // Use the stream to get the first batch of projects
+        final projectStream = _fs.getUserProjects(userId).first;
+        projects = await projectStream;
+        debugPrint('✅ STEP 3: Firebase returned ${projects.length} projects');
+        print(
+          '[DEBUG-LOAD] Before setState: current count = ${_allProjects.length}',
+        );
+        print('[DEBUG-LOAD] Firebase fetched: ${projects.length}');
+
+        for (var proj in projects) {
+          debugPrint(
+            '   📦 ${proj.name} (email=${proj.userEmail ?? "NOT SET"}, userId=${proj.userId})',
+          );
+        }
+
+        // ✅ FIX 6: SAVE PROJECTS LOCALLY AFTER FETCH
+        if (projects.isNotEmpty) {
+          for (var project in projects) {
+            await _persistence.saveProjectImmediately(project);
+          }
+          debugPrint('   ✅ Saved ${projects.length} projects to Hive');
+        }
+      } catch (e) {
+        // If Firebase fails, fall back to local cache
+        debugPrint('⚠️ STEP 3: Firebase fetch failed: $e');
+        debugPrint('   Falling back to local cache...');
+        projects = await _persistence.getCachedUserProjects(userId);
+        debugPrint('✅ STEP 3: Loaded ${projects.length} projects from cache');
+
+        for (var proj in projects) {
+          debugPrint(
+            '   📦 ${proj.name} (email=${proj.userEmail ?? "NOT SET"}, userId=${proj.userId})',
+          );
+        }
+      }
+
+      // ✅ FIX 2: PREVENT EMPTY API OVERWRITE - Only update if response is not empty
+      if (projects.isNotEmpty) {
+        print('[DEBUG-LOAD] Setting _allProjects to ${projects.length} items');
+        _allProjects = projects;
+        print(
+          '[DEBUG-LOAD] After assignment: _allProjects.length = ${_allProjects.length}',
+        );
+        debugPrint('   ✅ Updated _allProjects with ${projects.length} items');
+      } else {
+        debugPrint(
+          '   ⚠️ Skipping empty response. Keeping ${_allProjects.length} cached projects',
+        );
+        print('[DEBUG-LOAD] Empty response, keeping ${_allProjects.length}');
+      }
+
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint(
+        '✅ STEP 3-4 COMPLETE: UI PROJECT COUNT: ${_allProjects.length}',
+      );
+      print(
+        '[DEBUG-LOAD] Before notifyListeners: count = ${_allProjects.length}',
+      );
+      for (var proj in _allProjects) {
+        debugPrint('   ✔ ${proj.name} (${proj.status})');
+      }
+      debugPrint('═══════════════════════════════════════════════════════════');
       notifyListeners();
+      print(
+        '[DEBUG-LOAD] AFTER notifyListeners: count = ${_allProjects.length}',
+      );
     } catch (e) {
-      debugPrint('❌ Error loading all projects: $e');
-      _allProjects = [];
+      // ✅ FIX 1: PRESERVE EXISTING PROJECTS ON ERROR - Don't clear them
+      debugPrint('❌ STEP 3-4: Error loading all projects: $e');
+      debugPrint(
+        '   ⚠️ PRESERVING ${_allProjects.length} existing projects in memory',
+      );
+      print(
+        '[DEBUG-LOAD] ERROR in loadAllProjects: $e, preserving ${_allProjects.length} projects',
+      );
+      // DO NOT set _allProjects = []; - Keep existing cached projects
       notifyListeners();
+      print(
+        '[DEBUG-LOAD] After error notifyListeners: count = ${_allProjects.length}',
+      );
     }
   }
 
@@ -491,6 +638,17 @@ class BuilderProvider extends ChangeNotifier {
     _isSaving = true;
     notifyListeners();
 
+    // ✅ Verify userId before save
+    final currentUser = FirebaseAuth.instance.currentUser?.uid ?? '';
+    debugPrint('💾 AUTO-SAVE QUEUED: ${_project!.name}');
+    debugPrint('   Project id:   ${_project!.id}');
+    debugPrint('   Project uid:  ${_project!.userId}');
+    debugPrint('   Current user: $currentUser');
+
+    if (_project!.userId.isEmpty) {
+      debugPrint('⚠️ WARNING: Project has no userId - may not save correctly!');
+    }
+
     _persistence.debouncedSaveProject(_project!);
 
     // Reset saving state after a short delay
@@ -498,6 +656,7 @@ class BuilderProvider extends ChangeNotifier {
       if (_isSaving) {
         _isSaving = false;
         _lastSavedTime = DateTime.now();
+        debugPrint('✅ AUTO-SAVE COMMITTED: ${_project!.name}');
         notifyListeners();
       }
     });
@@ -516,7 +675,19 @@ class BuilderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final currentUser = FirebaseAuth.instance.currentUser?.uid ?? '';
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('💾 FORCE SAVE: project=${_project!.name} (${_project!.id})');
+      debugPrint('   Project userId:  ${_project!.userId}');
+      debugPrint('   Current user:    $currentUser');
+
+      if (_project!.userId != currentUser) {
+        debugPrint('⚠️ WARNING: userId mismatch during save!');
+      }
+
       await _persistence.saveProjectImmediately(_project!);
+      debugPrint('✅ FORCE SAVE SUCCESS: ${_project!.name}');
+      debugPrint('═══════════════════════════════════════════════════════════');
       _lastSavedTime = DateTime.now();
     } catch (e) {
       debugPrint('❌ Save failed: $e');
@@ -528,14 +699,19 @@ class BuilderProvider extends ChangeNotifier {
 
   /// Switch to another project with auto-save of current
   Future<void> switchProject(String newProjectId) async {
+    debugPrint('🔄 SWITCH PROJECT: from=${_project?.id} to=$newProjectId');
+
     // Save current project before switching
     if (_project != null) {
+      debugPrint('💾 Saving current project before switch...');
       await saveCurrentProject();
     }
 
     // Load new project
+    debugPrint('📥 Loading new project: $newProjectId');
     await loadProject(newProjectId);
     _currentActiveProjectId = newProjectId;
+    debugPrint('✅ PROJECT SWITCHED: ${_project?.name}');
     notifyListeners();
   }
 
@@ -544,6 +720,20 @@ class BuilderProvider extends ChangeNotifier {
   void dispose() {
     _persistence.cancelPendingSaves();
     super.dispose();
+  }
+
+  /// Clear in-memory data on logout (but don't delete from storage)
+  void clearOnLogout() {
+    debugPrint('🛑 CLEARING IN-MEMORY BUILDER DATA ON LOGOUT');
+    _project = null;
+    _allProjects = [];
+    _currentActiveProjectId = null;
+    _activeScreen = 0;
+    _selectedWidget = null;
+    _history.clear();
+    _projectsLoaded = false; // ✅ Allow reload on next login
+    _persistence.cancelPendingSaves();
+    notifyListeners();
   }
 
   void applyProject(ProjectModel updated) {

@@ -38,9 +38,11 @@ void main() async {
   await Hive.initFlutter();
   await Hive.openBox('appforge_cache');
 
-  // ✅ Initialize ProjectPersistenceService for auto-save
+  // ✅ Initialize ProjectPersistenceService for auto-save and offline cache
+  debugPrint('🔧 INITIALIZING PERSISTENCE SERVICE...');
   final persistenceService = ProjectPersistenceService();
   await persistenceService.init();
+  debugPrint('✅ PERSISTENCE SERVICE INITIALIZED');
 
   // ✅ Lock orientation
   await SystemChrome.setPreferredOrientations([
@@ -56,6 +58,7 @@ void main() async {
   // ✅ Initialize NetworkConfig - detects system IP for backend connection
   await NetworkConfig.getBackendBaseUrl();
 
+  debugPrint('🚀 APP STARTING...');
   runApp(const AppForgeApp());
 }
 

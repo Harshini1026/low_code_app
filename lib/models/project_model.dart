@@ -3,6 +3,7 @@ import 'screen_model.dart';
 
 class ProjectModel {
   final String id, name, userId, templateId, templateName;
+  final String? userEmail; // ✅ FIX 1: Email for permanent user-based storage
   final List<AppScreen> screens;
   final ProjectTheme theme;
   final BackendConfig backendConfig;
@@ -23,6 +24,7 @@ class ProjectModel {
     required this.updatedAt,
     this.status = 'draft',
     this.publishedUrl,
+    this.userEmail,
   });
 
   factory ProjectModel.fromFirestore(DocumentSnapshot doc) {
@@ -42,12 +44,14 @@ class ProjectModel {
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       status: d['status'] ?? 'draft',
       publishedUrl: d['publishedUrl'],
+      userEmail: d['userEmail'], // ✅ FIX 1: Load email from Firestore
     );
   }
 
   Map<String, dynamic> toFirestore() => {
     'name': name,
     'userId': userId,
+    'userEmail': userEmail, // ✅ FIX 1: Save email to Firestore
     'templateId': templateId,
     'templateName': templateName,
     'screens': screens.map((s) => s.toMap()).toList(),
@@ -65,6 +69,7 @@ class ProjectModel {
     'id': id,
     'name': name,
     'userId': userId,
+    'userEmail': userEmail, // ✅ FIX 1: Save email to local storage
     'templateId': templateId,
     'templateName': templateName,
     'screens': screens.map((s) => s.toMap()).toList(),
@@ -85,6 +90,7 @@ class ProjectModel {
   }) => ProjectModel(
     id: id,
     userId: userId,
+    userEmail: userEmail, // ✅ FIX 1: Preserve email in copyWith
     templateId: templateId,
     templateName: templateName,
     createdAt: createdAt,

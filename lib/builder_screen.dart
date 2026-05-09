@@ -28,6 +28,13 @@ class _BuilderScreenState extends State<BuilderScreen> {
   _Panel _activePanel = _Panel.widgets;
   String _deviceMode = 'Mobile';
 
+  // ✅ FIX 4: IMPORTANT - Cancel/back operations MUST:
+  // 1. Never delete the project from storage
+  // 2. Never clear the builder state
+  // 3. Never reset the project to an earlier version
+  // 4. Just navigate back or close dialogs
+  // 5. Always save before navigating away
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +45,19 @@ class _BuilderScreenState extends State<BuilderScreen> {
 
   void _selectPanel(_Panel panel) {
     setState(() => _activePanel = panel);
+  }
+
+  /// ✅ FIX 3 & 4: Save project before exiting builder
+  /// This ensures that all changes are persisted before navigation
+  Future<void> _handleBack(BuildContext ctx, BuilderProvider provider) async {
+    if (provider.project != null) {
+      debugPrint('🔄 SAVE BEFORE EXIT: ${provider.project!.name}');
+      // ✅ FIX 3: Force save immediately
+      await provider.saveCurrentProject();
+      debugPrint('✅ SAVED BEFORE BACK: ${provider.project!.name}');
+    }
+    // ✅ Only after save completes → allow navigation
+    if (ctx.mounted) ctx.go('/home');
   }
 
   @override
@@ -81,7 +101,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
               onUndo: provider.canUndo ? provider.undo : null,
               onPreview: () => context.go('/preview/${widget.projectId}'),
               onPublish: () => context.go('/publish/${widget.projectId}'),
-              onBack: () => context.go('/home'),
+              onBack: () => _handleBack(context, provider),
             ),
 
             // ── Body: 3-column layout ───────────────────────────────────────────────
